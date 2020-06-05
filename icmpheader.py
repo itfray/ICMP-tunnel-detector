@@ -80,12 +80,14 @@ class ICMPHeader:
             self.checksum = kwargs.get("hchecksum", 0)
             self.other_bs = kwargs.get("hother_bytes", bytearray(4))
         else:
-            self.set_bytes(bs)
+            self.read_bytes_from(bs)
 
-    def set_bytes(self, bs: bytes)-> None:
-        assert len(bs) == self.length, "Bad icmp-header's length!!!"
-        self.type, self.code, self.checksum = struct.unpack_from(">2BH", bs)
-        self.other_bs = bytearray(bs[4:8])
+    def read_bytes_from(self, bs: bytes, offset = 0)-> None:
+        self.type, self.code, self.checksum = struct.unpack_from(">2BH", bs, offset)
+        self.other_bs = bytearray(bs[offset + 4:offset + 8])
+
+    def write_bytes_into(self, buf: bytearray, offset):
+        struct.pack_into(">2BH4s", buf, offset, self.type, self.code, self.checksum, bytes(self.other_bs))
 
     def to_bytes(self)-> bytes:
         bs = struct.pack(">2BH", self.type, self.code, self.checksum) + self.other_bs

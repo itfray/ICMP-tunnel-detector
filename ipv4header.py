@@ -57,23 +57,33 @@ class IPv4Header:
             self.dst_addr = kwargs.get("hdst_addr", "0.0.0.0")
             self.options_bytes = kwargs.get("hoptions_bytes", bytearray())
         else:
-            self.set_bytes(bs)
+            self.read_bytes_from(bs)
 
-    def set_bytes(self, bs: bytes)-> None:
-        assert self.min_length <= len(bs) <= self.max_length, "Bad ip-header's length!!!"
-        hvl, self.type_of_service, self.total_length, self.id, hdmoff = struct.unpack_from('>2B3H', bs)
+    def read_bytes_from(self, bs: bytes, offset = 0)-> None:
+        hvl, self.type_of_service, self.total_length, self.id, hdmoff = struct.unpack_from('>2B3H', bs, offset)
         self.header_length = hvl & 0x0f
         self.version = hvl >> 4
         self.dont_fragment = int(hdmoff & 0x4000 != 0)
         self.more_fragments = int(hdmoff & 0x2000 != 0)
         self.fragment_offset = hdmoff & 0x1fff
-        self.ttl, self.protocol, self.checksum = struct.unpack_from('>2BH', bs, 8)
-        self.src_addr, self.dst_addr = socket.inet_ntoa(bs[12:16]), socket.inet_ntoa(bs[16:20])
+        self.ttl, self.protocol, self.checksum = struct.unpack_from('>2BH', bs, offset + 8)
+        self.src_addr = socket.inet_ntoa(bs[offset + 12:offset + 16])
+        self.dst_addr = socket.inet_ntoa(bs[offset + 16:offset + 20])
         len_in_bytes = self.header_length * 4
-        if len_in_bytes == len(bs) and len_in_bytes > self.min_length:
-            self.options_bytes = bytearray(bs[self.min_length:len_in_bytes])
+        if len_in_bytes > self.min_length and len(bs) - offset - len_in_bytes >= 0:
+            self.options_bytes = bytearray(bs[offset + self.min_length:offset + len_in_bytes])
         else:
             self.options_bytes = bytearray()
+
+    def write_bytes_into(self, barr: bytearray, offset = 0)-> None:
+        assert len(self.options_bytes) <= self.max_length - self.min_length, "Bad ip-header's length!!!"
+        hvl = (self.version << 4) + self.header_length
+        hdmoff = (0x4000 if self.dont_fragment else 0) + (0x2000 if self.more_fragments else 0) + self.fragment_offset
+        frmt_str = f'>2B3H2BH4s4s{len(self.options_bytes)}s'
+        bs = struct.pack_into(frmt_str, barr, offset, hvl, self.type_of_service, self.total_length,
+                              self.id, hdmoff, self.ttl, self.protocol, self.checksum,
+                              socket.inet_aton(self.src_addr), socket.inet_aton(self.dst_addr),
+                              bytes(self.options_bytes))
 
     def to_bytes(self)-> bytes:
         hvl = (self.version << 4) + self.header_length
