@@ -38,8 +38,8 @@ import net_header
 
 
 class IPv4Header(net_header.InterfaceNetHeader):
-    min_length = 20
-    max_length = 60
+    MinLength = 20
+    MaxLength = 60
     def __init__(self, **kwargs):
         bs = kwargs.get("hbytes")
         if bs is None:
@@ -71,13 +71,13 @@ class IPv4Header(net_header.InterfaceNetHeader):
         self.src_addr = socket.inet_ntoa(bs[offset + 12:offset + 16])
         self.dst_addr = socket.inet_ntoa(bs[offset + 16:offset + 20])
         len_in_bytes = self.header_length * 4
-        if len_in_bytes > self.min_length and len(bs) - offset - len_in_bytes >= 0:
-            self.options_bytes = bytearray(bs[offset + self.min_length:offset + len_in_bytes])
+        if len_in_bytes > self.MinLength and len(bs) - offset - len_in_bytes >= 0:
+            self.options_bytes = bytearray(bs[offset + self.MinLength:offset + len_in_bytes])
         else:
             self.options_bytes = bytearray()
 
     def write_bytes_into(self, barr: bytearray, offset = 0)-> None:
-        assert len(self.options_bytes) <= self.max_length - self.min_length, "Bad ip-header's length!!!"
+        assert len(self.options_bytes) <= self.MaxLength - self.MinLength, "Bad ip-header's length!!!"
         hvl = (self.version << 4) + self.header_length
         hdmoff = (0x4000 if self.dont_fragment else 0) + (0x2000 if self.more_fragments else 0) + self.fragment_offset
         frmt_str = f'>2B3H2BH4s4s{len(self.options_bytes)}s'
@@ -92,7 +92,7 @@ class IPv4Header(net_header.InterfaceNetHeader):
         bs = struct.pack('>2B3H2BH', hvl, self.type_of_service, self.total_length, self.id, hdmoff,
                            self.ttl, self.protocol, self.checksum) + \
                            socket.inet_aton(self.src_addr) + socket.inet_aton(self.dst_addr) + self.options_bytes
-        assert self.min_length <= len(bs) <= self.max_length, "Bad ip-header's length!!!"
+        assert self.MinLength <= len(bs) <= self.MaxLength, "Bad ip-header's length!!!"
         return bs
 
     def to_bytearray(self)-> bytearray:

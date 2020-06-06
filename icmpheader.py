@@ -72,7 +72,7 @@ TYPE_v6DuplicateAddressConfirmation = 158
 
 
 class ICMPHeader(net_header.InterfaceNetHeader):
-    length = 8
+    Length = 8
     def __init__(self, **kwargs):
         bs = kwargs.get("hbytes")
         if bs is None:
@@ -92,12 +92,12 @@ class ICMPHeader(net_header.InterfaceNetHeader):
 
     def to_bytes(self)-> bytes:
         bs = struct.pack(">2BH", self.type, self.code, self.checksum) + self.other_bs
-        assert len(bs) == self.length, "Bad icmp-header's length!!!"
+        assert len(bs) == self.Length, "Bad icmp-header's length!!!"
         return bs
 
     def to_bytearray(self)-> bytearray:
         barr = bytearray(struct.pack(">2BH", self.type, self.code, self.checksum)) + self.other_bs
-        assert len(barr) == self.length, "Bad icmp-header's length!!!"
+        assert len(barr) == self.Length, "Bad icmp-header's length!!!"
         return barr
 
     def __repr__(self):
@@ -133,6 +133,7 @@ def icmpv4_seq_num(icmph):
 # +-------+-----------------------+------------------------------+      ---
 
 class ICMPExtHeader(net_header.InterfaceNetHeader):
+    Length = 4
     def __init__(self, **kwargs):
         bs = kwargs.get("hbytes")
         if bs is None:
@@ -170,29 +171,30 @@ class ICMPExtHeader(net_header.InterfaceNetHeader):
 # +-------------------------------+--------------+---------------+      ---
 
 class ICMPExtObjHeader(net_header.InterfaceNetHeader):
+    Length = 4
     def __init__(self, **kwargs):
         bs = kwargs.get("hbytes")
         if bs is None:
-            self.length = kwargs.get("hlength", 0)
+            self.len = kwargs.get("hlen", 0)
             self.cls_num = kwargs.get("hcls_num", 0)
             self.c_type = kwargs.get("hc_type", 0)
         else:
             self.read_bytes_from(bs, 0)
 
     def read_bytes_from(self, bs: bytes, offset: int)-> None:
-        self.length, self.cls_num, self.c_type = struct.unpack_from('>H2B', bs, offset)
+        self.len, self.cls_num, self.c_type = struct.unpack_from('>H2B', bs, offset)
 
     def write_bytes_into(self, buf: bytearray, offset: int)-> None:
-        struct.pack_into('>H2B', buf, offset, self.length, self.cls_num, self.c_type)
+        struct.pack_into('>H2B', buf, offset, self.len, self.cls_num, self.c_type)
 
     def to_bytes(self)-> bytes:
-        return struct.pack('>H2B', self.length, self.cls_num, self.c_type)
+        return struct.pack('>H2B', self.len, self.cls_num, self.c_type)
 
     def to_bytearray(self)-> bytearray:
         return bytearray(self.to_bytes())
 
     def __repr__(self):
-        return "[ICMPExtObjHeader] {len: " + str(self.length) + ", cls_num: " + str(self.cls_num) + \
+        return "[ICMPExtObjHeader] {len: " + str(self.len) + ", cls_num: " + str(self.cls_num) + \
                 ", c_type: " + str(self.c_type) + "}"
 
     def __str__(self):
@@ -209,6 +211,7 @@ class ICMPExtObjHeader(net_header.InterfaceNetHeader):
 # +-------------------------------+--------------+---------------+      ---
 
 class ICMPIntIdObjAddrHeader(net_header.InterfaceNetHeader):
+    Length = 4
     def __init__(self, **kwargs):
         bs = kwargs.get("hbytes")
         if bs is None:
