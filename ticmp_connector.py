@@ -218,18 +218,18 @@ MAX_DATA_SIZE_v4ICMPEcho = 65507
 
 class TICMPConnector:
     def __init__(self, **kwargs):
-        self.init_connection(**kwargs)
+        self.init_connection(kwargs.get("conn_id", 8191),
+                             kwargs.get("scr_coeffs", [1, 3, 5]),
+                             kwargs.get("listen_addr", '127.0.0.1'))
 
-    def init_connection(self, **kwargs):
+    def init_connection(self, conn_id: int, scr_coeffs: list, listen_addr: str)-> None:
         """Method for initialization ticmp-connection.
            set all params connection in other values or default values"""
-        self.set_id(kwargs.get("id", 8191))
+        self.set_id(conn_id)        # set connection id
         self.__seq_num = 0
-        scr_coeffs = kwargs.get("scr_coeffs")
-        self.__scrambler = bytes_scrambler.Scrambler(scr_coeffs if scr_coeffs else [1, 3, 5])
+        self.__scrambler = bytes_scrambler.Scrambler(scr_coeffs)      # set scrambler coefficients
         self.__socket = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
-        self.__socket.bind((kwargs.get("listen_addr",
-                                       socket.gethostbyname_ex(socket.gethostname())[2][-1]), 0))
+        self.__socket.bind((listen_addr, 0))                          # set listen address
 
     def set_scrambler_coeffs(self, coeffs: list)-> None:
         self.__scrambler.set_coeffs(coeffs)
@@ -851,7 +851,7 @@ class TICMPConnector:
         if len(data) < 1 or len(data) > MAX_DATA_SIZE_v4ICMP - self.scrambler_coeffs()[0]:
             raise ValueError(f"Bad data size for sending!!! min size: 1 byte, max size: {MAX_DATA_SIZE_v4ICMP - self.scrambler_coeffs()[0]}")
         sent =  self.__socket.sendto(self.pack_data_in_packet(data), (addr, 0))
-        self.__seq_num += 1
+        self.__inc_seq_num()
         return sent
 
     def recvfrom(self)-> tuple:
@@ -865,7 +865,7 @@ class TICMPConnector:
                 if self.__id == hid and self.__seq_num == hseqn:
                     data = self.unpack_data_of_packet(data)
                     if data is not None:
-                        self.__seq_num += 1
+                        self.__inc_seq_num()
                         break
         finally:
             self.__socket.ioctl(socket.SIO_RCVALL, socket.RCVALL_OFF)
