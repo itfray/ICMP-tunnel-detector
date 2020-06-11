@@ -1,4 +1,5 @@
-from network_component import DEFAULT_ID, DEFAULT_TIMEOUT, DEFAULT_LISTEN_ADDR, DEFAULT_SCRAMBLER_COEFFS
+from network_component import DEFAULT_TIMEOUT, DEFAULT_LISTEN_ADDR, DEFAULT_SCRAMBLER_COEFFS
+from network_component import DEFAULT_CLIENT_ID, DEFAULT_SERVER_ID
 from network_component import NetworkComponent, print_message
 from rfc1071_checksum import checksum
 import argparse
@@ -13,8 +14,9 @@ DEFAULT_FILE = 'default_file.txt'
 
 
 class Client(NetworkComponent):
-    def __init__(self, conn_id, remote_addr, mode, listen_addr, scr_coeffs, timeout, debug, filename, size_block_file):
-        super().__init__(conn_id, listen_addr, scr_coeffs, timeout, debug)
+    def __init__(self, pid: int, lid: int, remote_addr: str, listen_addr: str, scr_coeffs: list,
+                 mode: list, timeout: int, filename: str, size_block_file: int, debug: bool):
+        super().__init__(pid, lid, listen_addr, scr_coeffs, timeout, debug)
         self.__remote_addr = remote_addr
         self.mode = mode
 
@@ -48,13 +50,12 @@ class Client(NetworkComponent):
             if self.debug:
                 msg += f", data: 0x{data[:8].hex()}..., checksum: {hex(checksum(data))}"
             print_message(msg)
-            addr = None
-            while self.__remote_addr != addr and time.time() - t0 < timeout:
-                recv_data, addr = self.connector.recvfrom()
-                addr = addr[0]
+            recv_data, addr = self.connector.recvfrom()
+            addr = addr[0]
             if data != recv_data:
                 print_message("Error receiving data!!!")
                 break
+
 
     def read_file_data(self)->bytes:
         size_file = os.path.getsize(self.filename)
@@ -62,7 +63,7 @@ class Client(NetworkComponent):
             file.seek(self.offset_file, 0)
             data = file.read(self.size_block_file)
             self.offset_file += len(data)
-            if file.tell() == size_file:
+            if file.tell() == size_file:            # check pointer end of file
                 self.offset_file = 0
         return data
 
@@ -84,8 +85,11 @@ if __name__ == "__main__":
     parser.add_argument('remote_addr', type=str,
                         help="Specifies the address server")
 
-    parser.add_argument('-i', '--id', dest='id', type=int, default=DEFAULT_ID,
-                        help="Specifies the connection id for server")
+    parser.add_argument('-pid', '--process_id', dest='process_id', type=int, default=DEFAULT_CLIENT_ID,
+                        help="Specifies the connection icmp id for client")
+
+    parser.add_argument('-lid', '--listen_id', dest='listen_id', type=int, default=DEFAULT_SERVER_ID,
+                        help="Specifies the connection icmp id for server")
 
     parser.add_argument('-la', '--listen_addr', dest='listen_addr', type=str, default=DEFAULT_LISTEN_ADDR,
                         help="Specifies the interface's address that listen server")
@@ -115,7 +119,6 @@ if __name__ == "__main__":
                         help='Displays debugging information')
 
     args = parser.parse_args()
-
     if (args.data_rand and args.data_inp) or \
        (args.data_inp and args.data_file) or \
        (args.data_file and args.data_rand):
@@ -126,8 +129,8 @@ if __name__ == "__main__":
         mode = [True, False, False]
 
     print("start client...")
-    client = Client(args.id, args.remote_addr, mode, args.listen_addr,
-                    args.coeff if args.coeff else DEFAULT_SCRAMBLER_COEFFS, abs(args.timeout), args.debug,
-                    args.file, abs(args.size_block_file))
+    client = Client(args.process_id, args.listen_id, args.remote_addr, args.listen_addr,
+                    args.coeff if args.coeff else DEFAULT_SCRAMBLER_COEFFS, mode, abs(args.timeout),
+                    args.file, abs(args.size_block_file),  args.debug)
     client.run()
     print("stop client...")

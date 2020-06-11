@@ -1,4 +1,5 @@
-from network_component import DEFAULT_ID, DEFAULT_TIMEOUT, DEFAULT_LISTEN_ADDR, DEFAULT_SCRAMBLER_COEFFS
+from network_component import DEFAULT_TIMEOUT, DEFAULT_LISTEN_ADDR, DEFAULT_SCRAMBLER_COEFFS
+from network_component import DEFAULT_CLIENT_ID, DEFAULT_SERVER_ID
 from network_component import NetworkComponent, print_message
 from rfc1071_checksum import checksum
 import argparse
@@ -6,8 +7,8 @@ import time
 
 
 class Server(NetworkComponent):
-    def __init__(self, conn_id, listen_addr, scr_coeffs, timeout, debug):
-        super().__init__(conn_id, listen_addr, scr_coeffs, timeout, debug)
+    def __init__(self, process_id: int, listen_id: int, listen_addr: str, scr_coeffs: list, timeout: int, debug: bool):
+        super().__init__(process_id, listen_id, listen_addr, scr_coeffs, timeout, debug)
 
     def run(self):
         t0 = time.time()
@@ -25,8 +26,11 @@ class Server(NetworkComponent):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(add_help=True, description="ICMP-tunneling: server script")
 
-    parser.add_argument('-i', '--id', dest='id', type=int, default=DEFAULT_ID,
-                        help="Specifies the connection id for server")
+    parser.add_argument('-pid', '--process_id', dest='process_id', type=int, default=DEFAULT_SERVER_ID,
+                        help="Specifies the connection icmp id for server")
+
+    parser.add_argument('-lid', '--listen_id', dest='listen_id', type=int, default=DEFAULT_CLIENT_ID,
+                        help="Specifies the connection icmp id for client")
 
     parser.add_argument('-la', '--listen_addr', dest='listen_addr', type=str,
                         default=DEFAULT_LISTEN_ADDR,
@@ -44,7 +48,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     print("start server...")
-    server = Server(args.id, args.listen_addr,
+    server = Server(args.process_id, args.listen_id, args.listen_addr,
                     args.coeff if args.coeff else DEFAULT_SCRAMBLER_COEFFS, args.timeout, args.debug)
     server.run()
     print("stop server...")
