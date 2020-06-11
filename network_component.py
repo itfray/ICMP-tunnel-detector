@@ -15,12 +15,9 @@ def print_message(msg):
     print(f'[{datetime.datetime.now().strftime("%H:%M:%S.%f")}] {msg}')
 
 
-class NetworkComponent(abc.ABC):
+class NetworkComponent(abc.ABC, ticmp_connector.TICMPConnector):
     def __init__(self, process_id: int, listen_id: int, listen_addr: str, scr_coeffs: list, timeout: int, debug: bool):
-        self.connector = ticmp_connector.TICMPConnector(process_id=process_id,
-                                                        listen_id=listen_id,
-                                                        listen_addr=listen_addr,
-                                                        scr_coeffs=scr_coeffs)
+        super().__init__(process_id=process_id, listen_id=listen_id, listen_addr=listen_addr, scr_coeffs=scr_coeffs)
         self.timeout = timeout
         self.debug = debug
 

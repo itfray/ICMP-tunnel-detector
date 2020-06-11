@@ -224,12 +224,15 @@ class TICMPConnector:
                              kwargs.get("listen_addr", '127.0.0.1'),
                              kwargs.get("scr_coeffs", [1, 3, 5]))
 
-    def init_connection(self, process_id: int, listen_id: int, listen_addr: str, scr_coeffs: list)-> None:
+    def __del__(self):
+        self.close_connector()
+
+    def init_connection(self, process_id: int, listen_id: int, listen_addr: str, scr_coeffs: list, seq_num = 0)-> None:
         """Method for initialization ticmp-connection.
            set all params connection in other values or default values"""
         self.set_id(process_id)                                             # set connection id
         self.set_listen_id(listen_id)
-        self.__seq_num = 0
+        self.set_seq_num(seq_num)
         self.__scrambler = bytes_scrambler.Scrambler(scr_coeffs)            # set scrambler coefficients
         self.__listen_addr = listen_addr                                    # set listen address
         self.open_connector()
@@ -264,10 +267,15 @@ class TICMPConnector:
             raise ValueError("Uncorrect value for listen_id!!! listen_id must be 0 <= listen_id <= 65535")
         self.__listen_id = val
 
-    def __inc_seq_num(self):
+    def inc_seq_num(self):
         self.__seq_num += 1
         if self.__seq_num > 65535:
             self.__seq_num = 0
+
+    def set_seq_num(self, val):
+        if val < 0 or val > 65535:
+            raise ValueError("Uncorrect value for seq_num!!! seq_num must be 0 <= seq_num <= 65535")
+        self.__seq_num= val
 
     def id(self)-> int:
         return self.__id
@@ -878,24 +886,16 @@ class TICMPConnector:
             raise ValueError(f"Bad data size for sending!!! min size: 1 byte, max size: {MAX_DATA_SIZE_v4ICMP - self.scrambler_coeffs()[0]}")
         send_data = self.pack_data_in_packet(self.__id, self.__seq_num, data)
         sent =  self.__socket.sendto(send_data, (addr, 0))
-        self.__inc_seq_num()
         return sent
 
     def recvfrom(self)-> tuple:
-        try:
-            while True:
-                data, addr = self.__socket.recvfrom(65535)
-                iph = ipv4header.IPv4Header(hbytes=data)
-                data = data[iph.header_length * 4:]
-                hid, hseqn = self.id_seq_num_packet(data)
-                if self.__listen_id == hid and self.__seq_num == hseqn and iph.dst_addr == self.__listen_addr:
-                    data = self.unpack_data_of_packet(data)
-                    if data is not None:
-                        self.__inc_seq_num()
-                        break
-        except OSError:
-            self.close_connector()
+        while True:
+            data, addr = self.__socket.recvfrom(65535)
+            iph = ipv4header.IPv4Header(hbytes=data)
+            data = data[iph.header_length * 4:]
+            hid, hseqn = self.id_seq_num_packet(data)
+            if self.__listen_id == hid and self.__seq_num == hseqn and iph.dst_addr == self.__listen_addr:
+                data = self.unpack_data_of_packet(data)
+                if data is not None:
+                    break
         return data, addr
-
-    def __del__(self):
-        self.close_connector()

@@ -14,13 +14,15 @@ class Server(NetworkComponent):
         t0 = time.time()
         timeout = self.timeout * 60
         while time.time() - t0 < timeout:
-            data, addr = self.connector.recvfrom()
+            data, addr = self.recvfrom()
             addr = addr[0]
-            msg = f"Received {len(data)} bytes from {addr}"
-            if self.debug:
-                msg += f", data: 0x{data[:8].hex()}..., checksum: {hex(checksum(data))}"
-            print_message(msg)
-            self.connector.sendto(data, addr)
+            print_message(f"Received {len(data)} bytes from {addr}:{self.listen_id()}" +
+                          (f", data: 0x{data[:8].hex()}..., checksum: {hex(checksum(data))}" if self.debug else ''))
+
+            self.sendto(data, addr)
+            print_message(f"Sent {len(data)} bytes to {addr}:{self.listen_id()}" +
+                          (f", data: 0x{data[:8].hex()}..., checksum: {hex(checksum(data))}" if self.debug else ''))
+            self.inc_seq_num()
 
 
 if __name__ == "__main__":

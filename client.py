@@ -40,21 +40,25 @@ class Client(NetworkComponent):
                         print_message("Error, file generating is empty file!!!")
                         break
             data = total_data
-            max_size = ticmp_connector.MAX_DATA_SIZE_v4ICMP - self.connector.scrambler_coeffs()[0]
+            max_size = ticmp_connector.MAX_DATA_SIZE_v4ICMP - self.scrambler_coeffs()[0]
             if len(data) > max_size:
                 data = data[:max_size]
             total_data = total_data[len(data):]             # get part data and send her
 
-            self.connector.sendto(data, self.__remote_addr)
-            msg = f"Sent {len(data)} bytes to {self.__remote_addr}"
-            if self.debug:
-                msg += f", data: 0x{data[:8].hex()}..., checksum: {hex(checksum(data))}"
-            print_message(msg)
-            recv_data, addr = self.connector.recvfrom()
+            self.sendto(data, self.__remote_addr)
+            print_message(f"Sent {len(data)} bytes to {self.__remote_addr}:{self.listen_id()}" +
+                          (f", data: 0x{data[:8].hex()}..., checksum: {hex(checksum(data))}" if self.debug else ''))
+
+            recv_data, addr = self.recvfrom()
             addr = addr[0]
+            print_message(f"Received {len(recv_data)} bytes from {addr}:{self.listen_id()}" +
+                          (f", data: 0x{recv_data[:8].hex()}..., checksum: {hex(checksum(recv_data))}"
+                           if self.debug else ''))
+
             if data != recv_data:
                 print_message("Error receiving data!!!")
                 break
+            self.inc_seq_num()
 
 
     def read_file_data(self)->bytes:
@@ -76,7 +80,7 @@ class Client(NetworkComponent):
     def read_random_data(self)->bytes:
         return bytes([random.randint(0, 255)
                       for i in range(random.randint(1,
-                      ticmp_connector.MAX_DATA_SIZE_v4ICMP - self.connector.scrambler_coeffs()[0]))])
+                      ticmp_connector.MAX_DATA_SIZE_v4ICMP - self.scrambler_coeffs()[0]))])
 
 
 if __name__ == "__main__":
