@@ -451,13 +451,14 @@ class TICMPConnector:
                                      checksum(buffer[size_icmph_with_datagram:]))
                     struct.pack_into('>B', icmph.other_bs, 1, (size4data - 14 + zero_fill) // 4)
                 else:
-                    # 5 = len(0x45) + len(id) + len(seq_num)
-                    buffer = bytearray(icmph.Length + 5 + len(data) + this.scrambler_coeffs()[0])
+                    # 6 = len(0x45) + len(id) + len(seq_num) + len(lenbfill = "rubbish")
+                    # lenbfill need only compatibility with min size error message ^^)
+                    buffer = bytearray(icmph.Length + 6 + len(data) + this.scrambler_coeffs()[0])
                     buffer[icmph.Length] = 0x45
                     struct.pack_into('>HH', buffer, icmph.Length + 1, pid, seq_num)
-                    fmt = f'>{len(data) + this.scrambler_coeffs()[0]}s'
+                    fmt = f'>{len(data) + this.scrambler_coeffs()[0] + 1}s'
                     struct.pack_into(fmt, buffer, icmph.Length + 5,
-                                     this.__scrambler.scramble(data))
+                                     this.__scrambler.scramble(bytes([random.randint(0, 255)]), data))
             return buffer
 
         icmph = None
@@ -555,14 +556,15 @@ class TICMPConnector:
                                      checksum(buffer[size_icmph_with_datagram:]))
                     struct.pack_into('>B', icmph.other_bs, 1, (size4data - 15 + zero_fill) // 4)
                 else:
-                    # 4 = len(0x45) + len(id(1)) + len(seq_num)
-                    buffer = bytearray(icmph.Length + 4 + len(data) + self.scrambler_coeffs()[0])
+                    # 5 = len(0x45) + len(id(1)) + len(seq_num) + len(lenbfill = "rubbish")
+                    # lenbfill use for compatibility with min size version message
+                    buffer = bytearray(icmph.Length + 5 + len(data) + self.scrambler_coeffs()[0])
                     buffer[icmph.Length] = 0x45
                     icmpheader.icmpv4_set_id(icmph, pid & 0xff00)
                     struct.pack_into('>BH', buffer, icmph.Length + 1, pid & 0x00ff, seq_num)
-                    fmt = f'>{len(data) + self.scrambler_coeffs()[0]}s'
+                    fmt = f'>{len(data) + self.scrambler_coeffs()[0] + 1}s'         # 1 = len(lenbfill = "rubbish")
                     struct.pack_into(fmt, buffer, icmph.Length + 4,
-                                     self.__scrambler.scramble(data))
+                                     self.__scrambler.scramble(bytes([random.randint(0, 255)]), data))
         elif r == 3:
             # ====== v4TimeExceeded =========
             icmph = icmpheader.ICMPHeader(htype=icmpheader.TYPE_v4TimeExceeded, hcode=random.randint(0, 1))
@@ -723,7 +725,7 @@ class TICMPConnector:
                     for i in range(4):
                         extobjh = icmpheader.ICMPExtObjHeader()
                         extobjh.read_bytes_from(data, pos_packet)
-                        if extobjh.cls_num != 2 or extobjh.cls_num != role or extobjh.len != extobjh.Length + 80:
+                        if extobjh.cls_num != 2 or extobjh.c_type != role or extobjh.len != extobjh.Length + 80:
                             return None
                         pos_packet += extobjh.Length
 
@@ -755,8 +757,9 @@ class TICMPConnector:
                         role += 0b01000000
                     return unpack_of_bfill(self.__scrambler.descramble(buf))
                 else:
-                    # 5 = len(0x45) + len(id) + len(seq_num)
-                    return self.__scrambler.descramble(data[icmph.Length + 5:])
+                    # 6 = len(0x45) + len(id) + len(seq_num) + len(lenbfill = "rubbish")
+                    # len(lenbfill = "rubbish") need for compatibility with min size error message
+                    return self.__scrambler.descramble(data[icmph.Length + 5:])[1:]
 
         elif icmph.type == icmpheader.TYPE_v4Redirect:
             # 2 = len(0x45) + len(lenbfill)
@@ -797,7 +800,7 @@ class TICMPConnector:
                     for i in range(4):
                         extobjh = icmpheader.ICMPExtObjHeader()
                         extobjh.read_bytes_from(data, pos_packet)
-                        if extobjh.cls_num != 2 or extobjh.cls_num != role or extobjh.len != extobjh.Length + 76:
+                        if extobjh.cls_num != 2 or extobjh.c_type != role or extobjh.len != extobjh.Length + 76:
                             return None
                         pos_packet += extobjh.Length
 
@@ -825,8 +828,8 @@ class TICMPConnector:
                         role += 0b01000000
                     return unpack_of_bfill(self.__scrambler.descramble(buf))
                 else:
-                    # 4 = len(0x45) + len(id(1)) + len(seq_num)
-                    return self.__scrambler.descramble(data[icmph.Length + 4:])
+                    # 5 = len(0x45) + len(id(1)) + len(seq_num) + len(lenbfill = "rubbish")
+                    return self.__scrambler.descramble(data[icmph.Length + 4:])[1:]
         return None
 
 
@@ -887,42 +890,32 @@ class TICMPConnector:
         pack_data = self.pack_data_in_packet(self.__id, self.__seq_num, data)
         if self.debug:
             # //////////////////////// DEBUG ///////////////////////////////
-            print("====================== Sent ==========================")
-            print(icmpheader.ICMPHeader(hbytes=pack_data))
-            print("==========================================================")
+            print("sent: ", icmpheader.ICMPHeader(hbytes=pack_data))
             # //////////////////////// DEBUG ///////////////////////////////
         return self.__socket.sendto(pack_data, (addr, 0))
 
     def recvfrom(self)-> tuple:
-        # # //////////////////////// DEBUG ///////////////////////////////
-        # if self.debug:
-        #     print("======================== Received ===========================")
-        # # //////////////////////// DEBUG ///////////////////////////////
         while True:
             data, addr = self.__socket.recvfrom(65535)
             iph = ipv4header.IPv4Header(hbytes=data)
             data = data[iph.header_length * 4:]
             hid, hseqn = self.id_seq_num_packet(data)
 
-            # # //////////////////////// DEBUG ///////////////////////////////
-            # print(iph)
-            # icmph = icmpheader.ICMPHeader(hbytes=data)
-            # print("|____________", icmph)
-            # # //////////////////////// DEBUG ///////////////////////////////
+            # //////////////////////// DEBUG ///////////////////////////////
+            # if self.debug:
+            #     print(iph)
+            #     print("!______________", icmpheader.ICMPHeader(hbytes=data))
+            assert (hid, hseqn) != (-1, -1), 'Bad id and seq_num!!!'
+            # //////////////////////// DEBUG ///////////////////////////////
 
             if self.__listen_id == hid and self.__seq_num == hseqn and iph.dst_addr == self.__listen_addr:
                 # //////////////////////// DEBUG ///////////////////////////////
                 if self.debug:
-                    print("$$$$$$$$$$$$$$$$$$$$$ Received $$$$$$$$$$$$$$$$$$$$$$$$$$$")
-                    print(icmpheader.ICMPHeader(hbytes=data))
-                    print("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
+                    print("received: ", icmpheader.ICMPHeader(hbytes=data))
                 # //////////////////////// DEBUG ///////////////////////////////
+
                 data = self.unpack_data_of_packet(data)
+                assert data is not None, 'Bad data!!!'
                 if data is not None:
                     break
-
-        # # //////////////////////// DEBUG ///////////////////////////////
-        # if self.debug:
-        #     print("================================================================")
-        # # //////////////////////// DEBUG ///////////////////////////////
         return data, addr
