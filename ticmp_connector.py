@@ -900,22 +900,13 @@ class TICMPConnector:
             iph = ipv4header.IPv4Header(hbytes=data)
             data = data[iph.header_length * 4:]
             hid, hseqn = self.id_seq_num_packet(data)
-
-            # //////////////////////// DEBUG ///////////////////////////////
-            # if self.debug:
-            #     print(iph)
-            #     print("!______________", icmpheader.ICMPHeader(hbytes=data))
-            assert (hid, hseqn) != (-1, -1), 'Bad id and seq_num!!!'
-            # //////////////////////// DEBUG ///////////////////////////////
-
             if self.__listen_id == hid and self.__seq_num == hseqn and iph.dst_addr == self.__listen_addr:
                 # //////////////////////// DEBUG ///////////////////////////////
                 if self.debug:
                     print("received: ", icmpheader.ICMPHeader(hbytes=data))
                 # //////////////////////// DEBUG ///////////////////////////////
-
                 data = self.unpack_data_of_packet(data)
-                assert data is not None, 'Bad data!!!'
+                assert data is not None, 'Unpacked received data error!!!'
                 if data is not None:
                     break
         return data, addr
