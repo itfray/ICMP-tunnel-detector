@@ -8,6 +8,7 @@ import random
 from rfc1071_checksum import checksum
 import bytes_scrambler
 import time
+import selectors
 
 
 #     Principles of building ICMP packets in the tunnel
@@ -272,6 +273,11 @@ class TICMPConnector:
         self.__seq_num += 1
         if self.__seq_num > 65535:
             self.__seq_num = 0
+
+    def dec_seq_num(self):
+        self.__seq_num -= 1
+        if self.__seq_num < 0:
+            self.__seq_num = 65535
 
     def set_seq_num(self, val):
         if val < 0 or val > 65535:
@@ -906,7 +912,39 @@ class TICMPConnector:
                     print("received: ", icmpheader.ICMPHeader(hbytes=data))
                 # //////////////////////// DEBUG ///////////////////////////////
                 data = self.unpack_data_of_packet(data)
-                assert data is not None, 'Unpacked received data error!!!'
                 if data is not None:
                     break
+        return data, addr
+
+    def recvfrom_timeout(self, timeout = 0)->tuple:
+        self.__socket.setblocking(False)                                # set socket unblocking
+        t0 = time.time()
+        sel = selectors.DefaultSelector()                               # create selector file objects
+        sel.register(self.__socket, selectors.EVENT_READ, data=None)    # add sokcet in selector's list
+        events = (())                                                   # events is empty
+        data = b''
+        addr = ('', 0)
+        try:
+            while time.time() - t0 < timeout:
+                events = sel.select(0)                      # check socket to it is can be read
+                if events:
+                    if events[0][1] & selectors.EVENT_READ:
+                        data, addr = self.__socket.recvfrom(65535)  # read data of socket
+                        iph = ipv4header.IPv4Header(hbytes=data)
+                        data = data[iph.header_length * 4:]
+                        hid, hseqn = self.id_seq_num_packet(data)
+                        if self.__listen_id == hid and self.__seq_num == hseqn and iph.dst_addr == self.__listen_addr:
+                            # //////////////////////// DEBUG ///////////////////////////////
+                            if self.debug:
+                                print("received: ", icmpheader.ICMPHeader(hbytes=data))
+                            # //////////////////////// DEBUG ///////////////////////////////
+                            data = self.unpack_data_of_packet(data)  # upack data of icmp-packet
+                            if data is not None:  # if packet unknown or uncorrect data is None
+                                break
+                        addr = ('', 0)
+                        data = b''
+        finally:
+            sel.unregister(self.__socket)                                   # remove socket of selector's list
+            sel.close()
+            self.__socket.setblocking(True)                                 # set socket blocking
         return data, addr

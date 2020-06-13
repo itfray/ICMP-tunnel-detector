@@ -13,16 +13,32 @@ class Server(NetworkComponent):
     def run(self):
         t0 = time.time()
         timeout = self.timeout * 60
+        send_data = recv_data = b'!!!Warning, server not receive message!!!'
+        send_addr = recv_addr = ''
+        count_send_msg = 0          # number of consecutively sent messages
         while time.time() - t0 < timeout:
-            data, addr = self.recvfrom()
-            addr = addr[0]
-            print_message(f"Received {len(data)} bytes from {addr}:{self.listen_id()}" +
-                          (f", data: {bytes(data[:8])}..., checksum: {hex(checksum(data))}" if self.debug else ''))
-            self.sendto(data, addr)
-            print_message(f"Sent {len(data)} bytes to {addr}:{self.listen_id()}" +
-                          (f", data: {bytes(data[:8])}..., checksum: {hex(checksum(data))}" if self.debug else ''))
-            print()
-            self.inc_seq_num()
+            recv_data, recv_addr = self.recvfrom_timeout(5)
+            if len(recv_data) > 0:
+                send_data = recv_data
+                send_addr = recv_addr[0]
+                print_message(f"Received {len(recv_data)} bytes from {send_addr}:{self.listen_id()}" +
+                     (f", data: {bytes(recv_data[:8])}..., checksum: {hex(checksum(recv_data))}" if self.debug else ''))
+                count_send_msg = 0
+            else:
+                if send_addr != '':
+                    self.dec_seq_num()
+
+            if send_addr != '':
+                self.sendto(send_data, send_addr)
+                print_message(f"Sent {len(send_data)} bytes to {send_addr}:{self.listen_id()}" +
+                     (f", data: {bytes(send_data[:8])}..., checksum: {hex(checksum(send_data))}" if self.debug else ''))
+                print()
+                self.inc_seq_num()
+                count_send_msg += 1
+            if count_send_msg > 4:
+                # client not posted on 5 consecutive messages
+                send_addr = ''
+                self.set_seq_num(0)
 
 
 if __name__ == "__main__":

@@ -28,13 +28,14 @@ class Client(NetworkComponent):
         t0 = time.time()
         timeout = self.timeout * 60                             # timeout in seconds
         total_data = b''                                        # data for sending
+        count_send_msg = 0                                          # number of consecutively sent messages
         while time.time() - t0 < timeout:
             if len(total_data) == 0:
                 if self.mode[0]:
                     ans = ''
                     while ans != 'y':
                         total_data = self.read_random_data()  # get ranom bytes
-                        ans = input(f"Sent {len(total_data)} bytes?(y/n)")
+                        ans = input(f"Sent {len(total_data)} bytes?(y/n)").lower()
                 elif self.mode[1]:
                     total_data = self.read_input_data()         # get bytes of input
                 else:
@@ -48,17 +49,32 @@ class Client(NetworkComponent):
                 data = data[:max_size]
             total_data = total_data[len(data):]                 # cut data of total data
 
-            self.sendto(data, self.__remote_addr)
-            print_message(f"Sent {len(data)} bytes to {self.__remote_addr}:{self.listen_id()}" +
-                          (f", data: {bytes(data[:8])}..., checksum: {hex(checksum(data))}" if self.debug else ''))
+            recv_data = b''
+            while len(recv_data) == 0 and time.time() - t0 < timeout:
+                self.sendto(data, self.__remote_addr)
+                print_message(f"Sent {len(data)} bytes to {self.__remote_addr}:{self.listen_id()}" +
+                              (f", data: {bytes(data[:8])}..., checksum: {hex(checksum(data))}" if self.debug else ''))
+                count_send_msg += 1
 
-            recv_data, addr = self.recvfrom()
-            addr = addr[0]
-            print_message(f"Received {len(recv_data)} bytes from {addr}:{self.listen_id()}" +
-                          (f", data: {bytes(recv_data[:8])}..., checksum: {hex(checksum(recv_data))}"
-                           if self.debug else ''))
-            print()
-            self.inc_seq_num()
+                recv_data, addr = self.recvfrom_timeout(2)
+                if len(recv_data) > 0:
+                    addr = addr[0]
+                    print_message(f"Received {len(recv_data)} bytes from {addr}:{self.listen_id()}" +
+                                  (f", data: {bytes(recv_data[:8])}..., checksum: {hex(checksum(recv_data))}"
+                                   if self.debug else ''))
+                    self.inc_seq_num()
+                    count_send_msg = 0
+                else:
+                    print_message("Error receiving data!!!")
+                print()
+
+                if count_send_msg > 4:
+                    # server not posted on 5 consecutive messages
+                    self.set_seq_num(0)
+
+                if count_send_msg > 5:
+                    # server not posted on 6 consecutive messages
+                    return
 
     def read_file_data(self)->bytes:
         size_file = os.path.getsize(self.filename)          # get file's size
