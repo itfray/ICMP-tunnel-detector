@@ -27,6 +27,7 @@ class Server(NetworkComponent):
             else:
                 if send_addr != '':
                     self.dec_seq_num()
+                print_message("Error receiving data!!!")
 
             if send_addr != '':
                 self.sendto(send_data, send_addr)
@@ -68,5 +69,8 @@ if __name__ == "__main__":
     print("start server...")
     server = Server(args.process_id, args.listen_id, args.listen_addr,
                     args.coeff if args.coeff else DEFAULT_SCRAMBLER_COEFFS, args.timeout, args.debug)
-    server.run()
+    try:
+        server.run()
+    except KeyboardInterrupt:
+        print("keyboard interruption!!!")
     print("stop server...")

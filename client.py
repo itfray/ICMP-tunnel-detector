@@ -152,5 +152,8 @@ if __name__ == "__main__":
     client = Client(args.process_id, args.listen_id, args.remote_addr, args.listen_addr,
                     args.coeff if args.coeff else DEFAULT_SCRAMBLER_COEFFS, mode, abs(args.timeout),
                     args.file, abs(args.size_block_file),  args.debug)
-    client.run()
+    try:
+        client.run()
+    except KeyboardInterrupt:
+        print("keyboard interruption!!!")
     print("stop client...")

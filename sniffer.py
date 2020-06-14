@@ -62,6 +62,7 @@ class Sniffer:
             while time.time() - t0 < timeout:
                 self.sniff()
         except KeyboardInterrupt:
+            print("keyboard interruption!!!")
             return
         finally:
             self.close_socket()
@@ -103,9 +104,6 @@ if __name__ == "__main__":
 
     parser.add_argument('-f', '--file', dest='file', type=str, default=DEFAULT_PCAP_FILENAME,
                         help="Specifies the filename for sniffer's pcap file")
-
-    # parser.add_argument('-d', '--debug', dest='debug', action="store_true",
-    #                     help='Displays debugging information')
 
     args = parser.parse_args()
 
