@@ -27,7 +27,6 @@ class Server(NetworkComponent):
             else:
                 if send_addr != '':
                     self.dec_seq_num()
-                print_message("Error receiving data!!!")
 
             if send_addr != '':
                 self.sendto(send_data, send_addr)

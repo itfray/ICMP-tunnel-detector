@@ -64,8 +64,6 @@ class Client(NetworkComponent):
                                    if self.debug else ''))
                     self.inc_seq_num()
                     count_send_msg = 0
-                else:
-                    print_message("Error receiving data!!!")
                 print()
 
                 if count_send_msg > 4:
