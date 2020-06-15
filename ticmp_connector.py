@@ -9,6 +9,7 @@ from rfc1071_checksum import checksum
 import bytes_scrambler
 import time
 import selectors
+import sys
 
 
 #     Principles of building ICMP packets in the tunnel
@@ -219,6 +220,7 @@ MAX_DATA_SIZE_v4ICMPEcho = 65507
 
 class TICMPConnector:
     def __init__(self, **kwargs):
+        self.__sys_platform__ = sys.platform
         self.__socket = None
         self.init_connection(kwargs.get("process_id", 8191),
                              kwargs.get("listen_id", 8191),
@@ -243,11 +245,13 @@ class TICMPConnector:
         if self.__socket is None:
             self.__socket = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
             self.__socket.bind((self.__listen_addr, 0))
-            self.__socket.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)
+            if self.__sys_platform__ == 'win32':
+                self.__socket.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)
 
     def close_connector(self):
         if self.__socket:
-            self.__socket.ioctl(socket.SIO_RCVALL, socket.RCVALL_OFF)
+            if self.__sys_platform__ == 'win32':
+                self.__socket.ioctl(socket.SIO_RCVALL, socket.RCVALL_OFF)
             self.__socket.close()
             del self.__socket
             self.__socket = None

@@ -47,8 +47,8 @@ class Sniffer:
                 self.__socket.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
                 self.__socket.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)
             else:
-                # self.__socket = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.ntohs(3))
-                self.__socket = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
+                self.__socket = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.ntohs(3))
+                #self.__socket = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
 
     def close_socket(self):
         if self.__socket:
