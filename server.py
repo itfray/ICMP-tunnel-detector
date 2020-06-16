@@ -65,11 +65,19 @@ if __name__ == "__main__":
                         help='Displays debugging information')
 
     args = parser.parse_args()
+
     print("start server...")
-    server = Server(args.process_id, args.listen_id, args.listen_addr,
-                    args.coeff if args.coeff else DEFAULT_SCRAMBLER_COEFFS, args.timeout, args.debug)
+    print()
+
     try:
+        server = Server(args.process_id, args.listen_id, args.listen_addr,
+                        args.coeff if args.coeff else DEFAULT_SCRAMBLER_COEFFS, args.timeout, args.debug)
         server.run()
     except KeyboardInterrupt:
         print("keyboard interruption!!!")
+    except PermissionError:
+        print("Permission denied!!! Need run programm with superuser privileges!!!")
+    except OSError as err:
+        print(err)
+    print()
     print("stop server...")

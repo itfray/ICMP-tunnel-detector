@@ -147,11 +147,20 @@ if __name__ == "__main__":
         mode = [True, False, False]
 
     print("start client...")
-    client = Client(args.process_id, args.listen_id, args.remote_addr, args.listen_addr,
-                    args.coeff if args.coeff else DEFAULT_SCRAMBLER_COEFFS, mode, abs(args.timeout),
-                    args.file, abs(args.size_block_file),  args.debug)
+    print()
+
     try:
+        client = Client(args.process_id, args.listen_id, args.remote_addr, args.listen_addr,
+                        args.coeff if args.coeff else DEFAULT_SCRAMBLER_COEFFS, mode, abs(args.timeout),
+                        args.file, abs(args.size_block_file), args.debug)
         client.run()
     except KeyboardInterrupt:
         print("keyboard interruption!!!")
+    except FileNotFoundError:
+        print(f"File {client.filename} not found!!!")
+    except PermissionError:
+        print("Permission denied!!! Need run programm with superuser privileges!!!")
+    except OSError as err:
+        print(err)
+    print()
     print("stop client...")

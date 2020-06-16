@@ -60,24 +60,14 @@ class Sniffer:
 
     def __del__(self):
         self.close_socket()
-        self.main_pcap_file.close()
 
     def run(self):
         timeout = self.timeout * 60
         t0 = time.time()
-        try:
-            while time.time() - t0 < timeout:
-                self.sniff()
-        except KeyboardInterrupt:
-            print("keyboard interruption!!!")
-            return
-        finally:
-            self.close_socket()
-            self.main_pcap_file.close()
+        while time.time() - t0 < timeout:
+            self.sniff()
 
     def sniff(self):
-        timeout = self.timeout * 60
-        t0 = time.time()
         packet, addr = self.__socket.recvfrom(65565)
         eth_offset = 0
         if self.__sys_platform__ != 'win32':
@@ -118,6 +108,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     print("start sniffer...")
-    sniffer = Sniffer(listen_addr=args.listen_addr, timeout=args.timeout, filename=args.file)
-    sniffer.run()
+    print()
+    try:
+        sniffer = Sniffer(listen_addr=args.listen_addr, timeout=args.timeout, filename=args.file)
+        sniffer.run()
+    except KeyboardInterrupt:
+        print("keyboard interruption!!!")
+    except PermissionError:
+        print("Permission denied!!! Need run programm with superuser privileges!!!")
+    except OSError as err:
+        print(err)
+    print()
     print("stop sniffer...")
