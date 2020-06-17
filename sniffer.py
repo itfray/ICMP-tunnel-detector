@@ -82,18 +82,13 @@ class Sniffer:
                 if ip_hdr.more_fragments == 0:                                              # if this end fragment
                     packet = dict_packets[ip_hdr.id]
                     del dict_packets[ip_hdr.id]
-                    print("========================================================================")
                     answ = self.analyzer.analyze(packet, 0)
-                    if answ[1] > 0.5:
+                    if answ[1]:
                         print_message(f"Possible tunnel detected: {ip_hdr.src_addr}:{answ[0]} --> {ip_hdr.dst_addr}")
-                        print(answ)
-                        print()
-                    icmph = icmpheader.ICMPHeader()
-                    icmph.read_bytes_from(packet, 0)
-                    print(ip_hdr)
-                    print(icmph)
-                    print("========================================================================")
-                    print()
+                    # icmph = icmpheader.ICMPHeader()
+                    # icmph.read_bytes_from(packet, 0)
+                    # print(ip_hdr)
+                    # print(icmph)
 
 
 if __name__ == "__main__":
