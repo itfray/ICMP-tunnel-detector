@@ -34,6 +34,7 @@ class Sniffer:
         self.__listen_addr = kwargs.get('listen_addr', DEFAULT_LISTEN_ADDR)
         self.timeout = kwargs.get("timeout", DEFAULT_TIMEOUT)
         self.filename = kwargs.get("filename", DEFAULT_PCAP_FILENAME)
+        self.debug = kwargs.get("debug", False)
         self.main_pcap_file = pcap_file.EthPCAPFile(self.filename, 'w')
         self.open_socket()
 
@@ -82,13 +83,21 @@ class Sniffer:
                 if ip_hdr.more_fragments == 0:                                              # if this end fragment
                     packet = dict_packets[ip_hdr.id]
                     del dict_packets[ip_hdr.id]
+                    
+                    msg = ""
+                    if self.debug:
+                        icmph = icmpheader.ICMPHeader()
+                        icmph.read_bytes_from(packet, 0)
+                        msg = "[ICMP] {type: " + str(icmph.type) + ", code: " + str(icmph.code) + "} "
+
                     answ = self.analyzer.analyze(packet, 0)
                     if answ[1]:
-                        print_message(f"Possible tunnel detected: {ip_hdr.src_addr}:{answ[0]} --> {ip_hdr.dst_addr}")
-                    # icmph = icmpheader.ICMPHeader()
-                    # icmph.read_bytes_from(packet, 0)
-                    # print(ip_hdr)
-                    # print(icmph)
+                        msg += f"Possible tunnel detected: {ip_hdr.src_addr}:{answ[0]} --> {ip_hdr.dst_addr}"
+                    else:
+                        msg += f"{ip_hdr.src_addr} --> {ip_hdr.dst_addr}"
+                    
+                    if len(msg) > 0:
+                        print_message(msg)
 
 
 if __name__ == "__main__":
@@ -103,12 +112,15 @@ if __name__ == "__main__":
     parser.add_argument('-f', '--file', dest='file', type=str, default=DEFAULT_PCAP_FILENAME,
                         help="Specifies the filename for sniffer's pcap file")
 
+    parser.add_argument('-d', '--debug', dest='debug', action="store_true",
+                        help='Displays debugging information')
+
     args = parser.parse_args()
 
     print("start sniffer...")
     print()
     try:
-        sniffer = Sniffer(listen_addr=args.listen_addr, timeout=args.timeout, filename=args.file)
+        sniffer = Sniffer(listen_addr=args.listen_addr, timeout=args.timeout, filename=args.file, debug=args.debug)
         sniffer.run()
     except KeyboardInterrupt:
         print("keyboard interruption!!!")
