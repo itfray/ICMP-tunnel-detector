@@ -9,7 +9,7 @@ MIN_DATA_SIZE_v4ICMP = 1
 
 
 MIN_DATA_SIZE_v4ICMPErrMsg = 28
-MAX_DATA_SIZE_v4ICMPErrMsg = 576
+MAX_DATA_SIZE_v4ICMPErrMsg = 548
 
 
 # values deprecated icmp types
@@ -210,7 +210,9 @@ class ICMPAnalyzer:
                 codes = range(0, 1)
             else:
                 codes = range(0, 4)
-            if size_data != MIN_DATA_SIZE_v4ICMPErrMsg or icmph.code not in codes:
+                
+            if size_data < MIN_DATA_SIZE_v4ICMPErrMsg or \
+                    size_data > MAX_DATA_SIZE_v4ICMPErrMsg or icmph.code not in codes:
                 tunnelled = 1
             else:
                 val = struct.unpack_from('>B', packet, pos_data)[0]

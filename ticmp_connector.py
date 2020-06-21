@@ -212,7 +212,7 @@ MAX_DATA_SIZE_v4ICMPAddrMask = 4
 MAX_DATA_SIZE_v4ICMPTimestamp = 12
 
 MIN_DATA_SIZE_v4ICMPErrMsg = 28
-MAX_DATA_SIZE_v4ICMPErrMsg = 576
+MAX_DATA_SIZE_v4ICMPErrMsg = 548
 
 MAX_DATA_SIZE_v4ICMPRouterAdvertisement = 2040
 MAX_DATA_SIZE_v4ICMPEcho = 65507
@@ -397,7 +397,7 @@ class TICMPConnector:
                 # 6 = len(0x45) + len(id) + len(seq_num) + len(lenbfill)
                 buffer = fpack_3_11_4_min(this, pid, seq_num, icmph)
             else:
-                r = random.randint(0, 1) if size_encrypted_data <= 457 else 0
+                r = random.randint(0, 1) if size_encrypted_data <= 429 else 0
                 if r == 1:
                     # 7 = len(lenbfill) + len(seq_num) + len(id) + len(0x45) + len(lenzfill)
                     # max size ifname = 63 in ifname sub-obj with field length, ifindex size = 4, mtu size = 4 in rfc5837
@@ -405,11 +405,11 @@ class TICMPConnector:
                     # (63 * 4) + (4 * 4) + (4 * 4) + (4 * 4) = 300;  ifname*4 + ifindex*4 + ifaddr*4 + mtu*4
                     # (1 * 4) + (4 * 4) + (4 * 4) + 4 = 40;   len_ifname*4 + hdr_afi*4 + int_info_obj_hdr*4 + icmp_ext_header
                     # 300 - 4 * (63 - 45) = 228;
-                    # 576 - 340 = 236; 236 - 6 + 228 - 1 = 457 # 7 = len(0x45) + len(id) + len(seq_num) + len(lenbfill) + len(lenzfill)
+                    # 548 - 340 = 208; 208 - 6 + 228 - 1 = 429 # 7 = len(0x45) + len(id) + len(seq_num) + len(lenbfill) + len(lenzfill)
                     size_encrypted_data = len(data) + this.scrambler_coeffs()[0] + 1        # 1 = len(lenbfill)
-                    dif = size_encrypted_data - 230                                         # 230 = 236 - 6
+                    dif = size_encrypted_data - 202                                         # 202 = 208 - 6
                     bfill_size = 228 - dif if dif > 0 else 228
-                    size4data = (230 if size_encrypted_data > 230 else size_encrypted_data)     # size datagram field
+                    size4data = (202 if size_encrypted_data > 202 else size_encrypted_data)     # size datagram field
                     if size_encrypted_data < 122:
                         zero_fill = 122 - size_encrypted_data                                   # 122 = 128 - 6
                     else:
@@ -506,18 +506,18 @@ class TICMPConnector:
                                  self.__scrambler.scramble(bytes([bfill_size]), data,
                                                            bytes([random.randint(0, 255) for i in range(bfill_size)])))
             else:
-                r = random.randint(0, 1) if size_encrypted_data <= 458 else 0
+                r = random.randint(0, 1) if size_encrypted_data <= 430 else 0
                 if r == 1:
                     # 6 = len(lenbfill) + len(seq_num) + len(id(1)) + len(0x45) + len(lenzfill)
                     # (63 * 4) + (4 * 4) + (4 * 4) = 284;  ifname*4 + ifindex*4 + ifaddr*4
                     # (1 * 4) + (4 * 4) + (4 * 4) + 4 = 40;   len_ifname*4 + hdr_afi*4 + int_info_obj_hdr*4 + icmp_ext_header
                     # 284 - 4 * (63 - 45) = 212;
-                    # 576 - 324 = 252; 252 - 6 + 212 = 458        # 6 = len(lenbfill) + len(seq_num) + len(id(1)) + len(0x45) + len(lenzfill)
+                    # 548 - 324 = 224; 224 - 6 + 212 = 430        # 6 = len(lenbfill) + len(seq_num) + len(id(1)) + len(0x45) + len(lenzfill)
                     icmpheader.icmpv4_set_id(icmph, pid & 0xff00)
                     size_encrypted_data = len(data) + self.scrambler_coeffs()[0] + 1        # 1 = len(lenbfill)
-                    dif = size_encrypted_data - 247                                         # 247 = 252 - 5
+                    dif = size_encrypted_data - 219                                         # 219 = 224 - 5
                     bfill_size = 212 - dif if dif > 0 else 212
-                    size4data = (247 if size_encrypted_data > 247 else size_encrypted_data)     # size datagram field
+                    size4data = (219 if size_encrypted_data > 219 else size_encrypted_data)     # size datagram field
                     if size_encrypted_data < 123:
                         zero_fill = 123 - size_encrypted_data                                   # 123 = 128 - 5
                     else:
@@ -717,7 +717,7 @@ class TICMPConnector:
             elif len(data) > icmph.Length + MIN_DATA_SIZE_v4ICMPErrMsg:
                 length = struct.unpack_from('>B', icmph.other_bs, 1)[0]
                 if length > 0:
-                    # 576 - 340 = 236; 236 - 6 + 228 - 1 = 457 # 7 = len(0x45) + len(id) + len(seq_num) + len(lenbfill) + len(lenzfill)
+                    # 548 - 340 = 208; 208 - 6 + 228 - 1 = 429 # 7 = len(0x45) + len(id) + len(seq_num) + len(lenbfill) + len(lenzfill)
                     lenzfill = struct.unpack_from('>B', data, icmph.Length + 5)[0]
                     size_data = length*4 + 20
                     if len(data) < icmph.Length + size_data + 340 or lenzfill > size_data:
@@ -792,7 +792,7 @@ class TICMPConnector:
             elif len(data) > icmph.Length + MIN_DATA_SIZE_v4ICMPErrMsg:
                 length = struct.unpack_from('>B', icmph.other_bs, 1)[0]
                 if length > 0:
-                    # 576 - 324 = 252; 252 - 6 + 212 = 458        # 6 = len(lenbfill) + len(seq_num) + len(id(1)) + len(0x45) + len(lenzfill)
+                    # 548 - 324 = 224; 224 - 6 + 212 = 430        # 6 = len(lenbfill) + len(seq_num) + len(id(1)) + len(0x45) + len(lenzfill)
                     lenzfill = struct.unpack_from('>B', data, icmph.Length + 4)[0]
                     size_data = length*4 + 20
                     if len(data) < icmph.Length + size_data + 324 or lenzfill > size_data:
