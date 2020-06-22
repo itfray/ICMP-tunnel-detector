@@ -223,6 +223,7 @@ class TICMPConnector:
                              kwargs.get("listen_id", 8191),
                              kwargs.get("listen_addr", '127.0.0.1'),
                              kwargs.get("scr_coeffs", [1, 3, 5]))
+        self.debug = kwargs.get("debug", False)
 
     def __del__(self):
         self.close_connector()
@@ -461,7 +462,6 @@ class TICMPConnector:
 
         icmph = None
         buffer = None
-        r = 11
         if r == 1:
             # ====== v4RouterAdvertisement =========
             # 5 = len(lenbfill) + len(id) + len(seq_num)
@@ -884,18 +884,45 @@ class TICMPConnector:
     def sendto(self, data: bytes, addr: str)-> int:
         if len(data) < 1 or len(data) > MAX_DATA_SIZE_v4ICMP - self.scrambler_coeffs()[0]:
             raise ValueError(f"Bad data size for sending!!! min size: 1 byte, max size: {MAX_DATA_SIZE_v4ICMP - self.scrambler_coeffs()[0]}")
-        send_data = self.pack_data_in_packet(self.__id, self.__seq_num, data)
-        sent =  self.__socket.sendto(send_data, (addr, 0))
-        return sent
+        pack_data = self.pack_data_in_packet(self.__id, self.__seq_num, data)
+        if self.debug:
+            # //////////////////////// DEBUG ///////////////////////////////
+            print("====================== Sent ==========================")
+            print(icmpheader.ICMPHeader(hbytes=pack_data))
+            print("==========================================================")
+            # //////////////////////// DEBUG ///////////////////////////////
+        return self.__socket.sendto(pack_data, (addr, 0))
 
     def recvfrom(self)-> tuple:
+        # # //////////////////////// DEBUG ///////////////////////////////
+        # if self.debug:
+        #     print("======================== Received ===========================")
+        # # //////////////////////// DEBUG ///////////////////////////////
         while True:
             data, addr = self.__socket.recvfrom(65535)
             iph = ipv4header.IPv4Header(hbytes=data)
             data = data[iph.header_length * 4:]
             hid, hseqn = self.id_seq_num_packet(data)
+
+            # # //////////////////////// DEBUG ///////////////////////////////
+            # print(iph)
+            # icmph = icmpheader.ICMPHeader(hbytes=data)
+            # print("|____________", icmph)
+            # # //////////////////////// DEBUG ///////////////////////////////
+
             if self.__listen_id == hid and self.__seq_num == hseqn and iph.dst_addr == self.__listen_addr:
+                # //////////////////////// DEBUG ///////////////////////////////
+                if self.debug:
+                    print("$$$$$$$$$$$$$$$$$$$$$ Received $$$$$$$$$$$$$$$$$$$$$$$$$$$")
+                    print(icmpheader.ICMPHeader(hbytes=data))
+                    print("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
+                # //////////////////////// DEBUG ///////////////////////////////
                 data = self.unpack_data_of_packet(data)
                 if data is not None:
                     break
+
+        # # //////////////////////// DEBUG ///////////////////////////////
+        # if self.debug:
+        #     print("================================================================")
+        # # //////////////////////// DEBUG ///////////////////////////////
         return data, addr
