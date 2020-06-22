@@ -1,5 +1,17 @@
 import random
 
+def min_index(arr: list)-> int:
+    if len(arr) == 0:
+        raise ValueError("Error calculating minimum empty list!!!")
+    min_ind = 0
+    min_val = arr[min_ind]
+    for i in range(len(arr)):
+        if min_val > arr[i]:
+            min_val = arr[i]
+            min_ind = i
+    return min_ind
+
+
 #       /* in functions scramblers:
 #            * source - pointer on current byte sequence;
 #            * destination - pointer on output encrypted byte sequence;
@@ -76,3 +88,26 @@ def scramble_many(coeffs: tuple, *args)-> bytearray:
                     bdst[dst_ind] ^= bdst[dst_ind - coeff]
             dst_ind += 1
     return bdst
+
+
+class Scrambler:
+    def __init__(self, scr_coeffs = [1, 3, 5]):
+        self.set_coeffs(scr_coeffs)
+
+    def scramble(self, *args)-> bytearray:
+        return scramble_many(self.__scr_coeffs, *args)
+
+    def descramble(self, bdata: bytes)-> bytearray:
+        return descramble(bdata, self.__scr_coeffs)
+
+    def set_coeffs(self, coeffs: list)-> None:
+        if len(coeffs) == 0:
+            raise ValueError("Bad size for scrambler coeffs!!!")
+        if 0 in coeffs:
+            raise ValueError("Value scrambler coefficient must be more than zero!!!")
+        min_ind = min_index(coeffs)
+        coeffs[min_ind], coeffs[0] = coeffs[0], coeffs[min_ind]
+        self.__scr_coeffs = tuple(coeffs)
+
+    def coeffs(self)-> tuple:
+        return self.__scr_coeffs
