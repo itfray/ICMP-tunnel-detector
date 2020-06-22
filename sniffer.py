@@ -1,5 +1,4 @@
 import socket
-import struct
 import sys
 import net_header
 import eth_dix_header
@@ -8,7 +7,6 @@ import icmpheader
 import pcap_file
 import time
 import argparse
-from print_net_header import print_ipv4_header, print_icmp_header
 import icmp_analyzer
 import datetime
 
@@ -48,7 +46,6 @@ class Sniffer:
                 self.__socket.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)
             else:
                 self.__socket = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.ntohs(3))
-                #self.__socket = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
 
     def close_socket(self):
         if self.__socket:
@@ -83,7 +80,7 @@ class Sniffer:
                 self.main_pcap_file.write(self.eth_hdr + packet, *time_sec_usec())
                 answ = self.analyzer.analyze(packet, 20)
 
-            if answ[1] > 0.66:
+            if answ[1] > 0.5:
                 print_message(f"Possible tunnel detected: {ip_hdr.src_addr}:{answ[0]} --> {ip_hdr.dst_addr}")
                 # print(answ)
                 # print()
@@ -115,7 +112,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("keyboard interruption!!!")
     except PermissionError:
-        print("Permission denied!!! Need run programm with superuser privileges!!!")
+        print("Permission denied!!! Need run program with superuser privileges!!!")
     except OSError as err:
         print(err)
     print()
