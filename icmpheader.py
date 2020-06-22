@@ -124,7 +124,7 @@ def icmpv4_seq_num(icmph):
     return struct.unpack_from(">H", icmph.other_bs, 2)[0]
 
 
-# ICMP Extension Struct Header
+# ICMP Extension Header
 # 0       4                       16                             31
 # +-------+-----------------------+------------------------------+      ---
 # |       |                       |                              |       ^
@@ -202,6 +202,17 @@ class ICMPExtObjHeader(net_header.InterfaceNetHeader):
 
 
 
+# RFC 8335
+# ICMP Interface Identification Object Header
+# 0                               16                             31
+# +-------------------------------+--------------+---------------+      ---
+# |                               |              |               |       ^
+# |          Length               |Class-Num = 3 | C-Type = 1-3  |     4 bytes
+# |                               |              |               |       v
+# +-------------------------------+--------------+---------------+      ---
+
+
+# RFC 8335
 # ICMP Interface Identification Object Address Header
 # 0                               16                             31
 # +-------------------------------+--------------+---------------+      ---
@@ -234,6 +245,62 @@ class ICMPIntIdObjAddrHeader(net_header.InterfaceNetHeader):
 
     def __repr__(self):
         return "[ICMPIntIdObjAddrHeader] {afi: " + str(self.afi) + ", addr_len: " + str(self.addr_len) + "}"
+
+    def __str__(self):
+        return self.__repr__()
+
+
+# RFC 5837
+# ICMP Interface Information Object Header
+# 0                               16                             31
+# +-------------------------------+--------------+---------------+      ---
+# |                               |              |               |       ^
+# |          Length               |Class-Num = 2 |    C-Type     |     4 bytes
+# |                               |              |               |       v
+# +-------------------------------+--------------+---------------+      ---
+#
+#    0        1       2       3       4       5       6      7
+# +---------------+-------+-------+-------+-------+-------+------+      ---
+# |               |       |       |       |       |       |      |       ^
+# |  Interface    | Rsvd1 | Rsvd2 |ifIndex|IPAddr |  name | MTU  |     1 byte
+# |    Role       |       |       |       |       |       |      |       v
+# +---------------+-------+-------+-------+-------+-------+------+      ---
+#                               C-Type field's bits
+
+
+
+# RFC 5837
+# ICMP Interface IP Address Sub-Object Header
+# 0                               16                             31
+# +-------------------------------+------------------------------+      ---
+# |                               |                              |       ^
+# |          AFI                  |          Reserved            |     4 bytes
+# |                               |                              |       v
+# +-------------------------------+------------------------------+      ---
+
+class ICMPIntIPAddrSubObjHeader(net_header.InterfaceNetHeader):
+    Length = 4
+    def __init__(self, **kwargs):
+        bs = kwargs.get("hbytes")
+        if bs is None:
+            self.afi = kwargs.get("hafi", 0)
+        else:
+            self.read_bytes_from(bs, 0)
+
+    def read_bytes_from(self, bs: bytes, offset: int)-> None:
+        self.afi, _ = struct.unpack_from('>H2s', bs, offset)
+
+    def write_bytes_into(self, buf: bytearray, offset: int)-> None:
+        struct.pack_into('>H2s', buf, offset, self.afi, b'\x00\x00')
+
+    def to_bytes(self)-> bytes:
+        return struct.pack('>H2s', self.afi, b'\x00\x00')
+
+    def to_bytearray(self)-> bytearray:
+        return bytearray(self.to_bytes())
+
+    def __repr__(self):
+        return "[ICMPIntIPAddrSubObjHeader] {afi: " + str(self.afi) + "}"
 
     def __str__(self):
         return self.__repr__()
