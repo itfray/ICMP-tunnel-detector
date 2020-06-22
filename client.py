@@ -17,33 +17,36 @@ class Client(NetworkComponent):
     def __init__(self, pid: int, lid: int, remote_addr: str, listen_addr: str, scr_coeffs: list,
                  mode: list, timeout: int, filename: str, size_block_file: int, debug: bool):
         super().__init__(pid, lid, listen_addr, scr_coeffs, timeout, debug)
-        self.__remote_addr = remote_addr
-        self.mode = mode
+        self.__remote_addr = remote_addr                        # adress server
+        self.mode = mode                                        # mode work
 
-        self.filename = filename
+        self.filename = filename                                # path to file
         self.size_block_file = size_block_file                  # size for block reading file
         self.offset_file = 0                                    # position in file generating data
 
     def run(self):
         t0 = time.time()
-        timeout = self.timeout * 60
+        timeout = self.timeout * 60                             # timeout in seconds
         total_data = b''                                        # data for sending
         while time.time() - t0 < timeout:
-            if total_data == b'':
+            if len(total_data) == 0:
                 if self.mode[0]:
-                    total_data = self.read_random_data()
+                    ans = ''
+                    while ans != 'y':
+                        total_data = self.read_random_data()  # get ranom bytes
+                        ans = input(f"Sent {len(total_data)} bytes?(y/n)")
                 elif self.mode[1]:
-                    total_data = self.read_input_data()
+                    total_data = self.read_input_data()         # get bytes of input
                 else:
-                    total_data = self.read_file_data()
+                    total_data = self.read_file_data()          # get bytes of file
                     if len(total_data) == 0:
                         print_message("Error, file generating is empty file!!!")
                         break
             data = total_data
-            max_size = ticmp_connector.MAX_DATA_SIZE_v4ICMP - self.scrambler_coeffs()[0]
+            max_size = ticmp_connector.MAX_DATA_SIZE_v4ICMP - self.scrambler_coeffs()[0]    # max size data for tarnsffer
             if len(data) > max_size:
                 data = data[:max_size]
-            total_data = total_data[len(data):]             # get part data and send her
+            total_data = total_data[len(data):]                 # cut data of total data
 
             self.sendto(data, self.__remote_addr)
             print_message(f"Sent {len(data)} bytes to {self.__remote_addr}:{self.listen_id()}" +
@@ -54,21 +57,16 @@ class Client(NetworkComponent):
             print_message(f"Received {len(recv_data)} bytes from {addr}:{self.listen_id()}" +
                           (f", data: {bytes(recv_data[:8])}..., checksum: {hex(checksum(recv_data))}"
                            if self.debug else ''))
-
-            if data != recv_data:
-                print_message("Error receiving data!!!")
-                break
             print()
             self.inc_seq_num()
 
-
     def read_file_data(self)->bytes:
-        size_file = os.path.getsize(self.filename)
+        size_file = os.path.getsize(self.filename)          # get file's size
         with open(self.filename, 'rb') as file:
-            file.seek(self.offset_file, 0)
-            data = file.read(self.size_block_file)
-            self.offset_file += len(data)
-            if file.tell() == size_file:            # check pointer end of file
+            file.seek(self.offset_file, 0)                  # set pointer in position offset file
+            data = file.read(self.size_block_file)          # read size_block_file bytes
+            self.offset_file += len(data)                   # inc offset in file
+            if file.tell() == size_file:                    # check pointer end of file
                 self.offset_file = 0
         return data
 
@@ -81,7 +79,8 @@ class Client(NetworkComponent):
     def read_random_data(self)->bytes:
         return bytes([random.randint(0, 255)
                       for i in range(random.randint(1,
-                      ticmp_connector.MAX_DATA_SIZE_v4ICMP - self.scrambler_coeffs()[0]))])
+                      random.choice([2, 4, 8, 16, 32, 64, 128, 256, 512, 1024,
+                                     2048, ticmp_connector.MAX_DATA_SIZE_v4ICMP - self.scrambler_coeffs()[0]])))])
 
 
 if __name__ == "__main__":
