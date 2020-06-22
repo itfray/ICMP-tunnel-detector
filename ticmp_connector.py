@@ -840,3 +840,20 @@ class TICMPConnector:
                     return -1, -1
                 return hid, hseq + base64.urlsafe_b64decode(data[min_size:min_size + 64])[0]  # get low byte seq_num of first octet ifname
         return -1, -1
+        
+    def sendto(self, data: bytes, addr: str)-> int:
+        if len(data) < 1 or len(data) > MAX_DATA_SIZE_v4ICMP - self.scrambler_coeffs()[0]:
+            raise ValueError(f"Bad data size for sending!!! min size: 1 byte, max size: {MAX_DATA_SIZE_v4ICMP - self.scrambler_coeffs()[0]}")
+        return self.__socket.sendto(self.pack_data_in_packet(data), (addr, 0))
+
+    def recvfrom(self, addr_listen_interface = socket.gethostbyname_ex(socket.gethostname())[2][-1])-> tuple:
+        self.__socket.bind((addr_listen_interface, 0))
+        # self.__socket.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
+        self.__socket.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)
+        while True:
+            data, addr = self.__socket.recvfrom(65515)
+            # ipv4h = ipv4header.IPv4Header(hbytes=data)
+            hid, hseqn = self.id_seq_num_packet(data)
+            if self.__id == hid and self.__seq_num == hseqn:
+                pass
+        self.__socket.ioctl(socket.SIO_RCVALL, socket.RCVALL_OFF)
