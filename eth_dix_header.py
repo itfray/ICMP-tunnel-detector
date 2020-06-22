@@ -20,7 +20,7 @@ class EthDixHeader(net_header.InterfaceNetHeader):
         struct.pack_into('>6s6sH', buf, offset, self.dst_addr, self.src_addr, self.type)
 
     def to_bytes(self) -> bytes:
-        struct.pack('>6s6sH', self.dst_addr, self.src_addr, self.type)
+        return struct.pack('>6s6sH', self.dst_addr, self.src_addr, self.type)
 
     def to_bytearray(self) -> bytearray:
         return bytearray(self.to_bytes())
@@ -44,25 +44,14 @@ class EthDixHeader(net_header.InterfaceNetHeader):
 
     @staticmethod
     def str_to_addr(saddr: str)-> bytes:
-        laddr = saddr.split(':')
+        if ':' in saddr:
+            laddr = saddr.split(':')
+        elif '-' in saddr:
+            laddr = saddr.split('-')
+        else:
+            raise ValueError("Unknown format mac-48 address!!!")
         assert len(laddr) == 6, 'Uncorrect mac-48 address!!!'
         addr = bytearray(6)
         for i in range(len(laddr)):
             struct.pack_into('>s', addr, i, bytearray.fromhex(laddr[i]))
         return bytes(addr)
-
-
-# ///////////////////// DEBUG ///////////////////////
-# if __name__ == "__main__":
-#     ethh = EthDixHeader(hdst_addr=b'\xff\x02\x03\x04\x05\x06',
-#                         hsrc_addr=b'\x06\x05\x04\x03\x02\x01',
-#                         htype=0x0800)
-#     print(ethh)
-#     buf = bytearray(b'\xff\x0f\xf0\x04\x05\x06' + b'\xf1\xf5\xe4\x93\x02\x01' + b'\x18\x0d')
-#     ethh.read_bytes_from(buf)
-#     print(ethh)
-#
-#     buf = bytearray(20)
-#     ethh.write_bytes_into(buf, 6)
-#     print(buf)
-# ///////////////////// DEBUG ///////////////////////
