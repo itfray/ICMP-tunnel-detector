@@ -1,5 +1,6 @@
 import struct
 import socket
+import net_header
 
 # Packet header for IPv4.
 #
@@ -36,7 +37,7 @@ import socket
 # +--------------------------------------------------------------+      ---
 
 
-class IPv4Header:
+class IPv4Header(net_header.InterfaceNetHeader):
     min_length = 20
     max_length = 60
     def __init__(self, **kwargs):
@@ -96,3 +97,14 @@ class IPv4Header:
 
     def to_bytearray(self)-> bytearray:
         return bytearray(self.to_bytes())
+
+    def __repr__(self):
+        return "[IPv4] {version: " + str(self.version) + ", hlen: " + str(self.header_length) + \
+               ", tos: " + str(self.type_of_service) + ", total_len: " + str(self.total_length) + \
+               ", id: " + str(hex(self.id)) + ", df: " + str(self.dont_fragment) + ", mfs: " + str(self.more_fragments) + \
+               ", foffset: " + str(self.fragment_offset) + ", ttl: " + str(self.ttl) + \
+               ", protocol: " + str(self.protocol) + ", checksum: " + str(hex(self.checksum)) + \
+               ", src_addr: " + self.src_addr + ", dst_addr: " + self.dst_addr + "}"
+
+    def __str__(self):
+        return self.__repr__()

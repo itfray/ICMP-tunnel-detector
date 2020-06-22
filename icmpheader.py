@@ -1,4 +1,5 @@
 import struct
+import net_header
 
 # ICMP header for both IPv4 and IPv6.
 #
@@ -70,7 +71,7 @@ TYPE_v6DuplicateAddressRequest = 157
 TYPE_v6DuplicateAddressConfirmation = 158
 
 
-class ICMPHeader:
+class ICMPHeader(net_header.InterfaceNetHeader):
     length = 8
     def __init__(self, **kwargs):
         bs = kwargs.get("hbytes")
@@ -98,6 +99,13 @@ class ICMPHeader:
         barr = bytearray(struct.pack(">2BH", self.type, self.code, self.checksum)) + self.other_bs
         assert len(barr) == self.length, "Bad icmp-header's length!!!"
         return barr
+
+    def __repr__(self):
+        return "[ICMP] {type: " + str(self.type) + ", code: " + str(self.code) + \
+               ", checksum: " + str(hex(self.checksum)) + ", other_bytes: " + self.other_bs.hex() + "}"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 def icmpv4_set_id(icmph, val):
