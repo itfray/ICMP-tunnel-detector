@@ -7,6 +7,7 @@ import net_header
 import random
 from rfc1071_checksum import checksum
 import bytes_scrambler
+import time
 
 
 #     Principles of building ICMP packets in the tunnel
@@ -217,11 +218,18 @@ MAX_DATA_SIZE_v4ICMPEcho = 65507
 
 class TICMPConnector:
     def __init__(self, **kwargs):
+        self.init_connection(**kwargs)
+
+    def init_connection(self, **kwargs):
+        """Method for initialization ticmp-connection.
+           set all params connection in other values or default values"""
         self.set_id(kwargs.get("id", 8191))
         self.__seq_num = 0
         scr_coeffs = kwargs.get("scr_coeffs")
         self.__scrambler = bytes_scrambler.Scrambler(scr_coeffs if scr_coeffs else [1, 3, 5])
         self.__socket = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
+        self.__socket.bind((kwargs.get("listen_addr",
+                                       socket.gethostbyname_ex(socket.gethostname())[2][-1]), 0))
 
     def set_scrambler_coeffs(self, coeffs: list)-> None:
         self.__scrambler.set_coeffs(coeffs)
@@ -231,11 +239,19 @@ class TICMPConnector:
 
     def set_id(self, val: int)-> None:
         if val < 0 or val > 65535:
-            raise ValueError("Uncorrect value for id!!! id must be 0 <= id < 65536")
+            raise ValueError("Uncorrect value for id!!! id must be 0 <= id <= 65535")
         self.__id = val
+
+    def __inc_seq_num(self):
+        self.__seq_num += 1
+        if self.__seq_num > 65535:
+            self.__seq_num = 0
 
     def id(self)-> int:
         return self.__id
+
+    def seq_num(self)-> int:
+        return self.__seq_num
 
     def pack_data_in_packet(self, data: bytes):
         assert len(data) > 0 and len(data) <= MAX_DATA_SIZE_v4ICMP - self.scrambler_coeffs()[0],\
@@ -412,7 +428,6 @@ class TICMPConnector:
 
         icmph = None
         buffer = None
-        r = 7
         if r == 1:
             # ====== v4RouterAdvertisement =========
             # 5 = len(lenbfill) + len(id) + len(seq_num)
@@ -474,7 +489,7 @@ class TICMPConnector:
                     fmt = f'>{size4data}s'
                     struct.pack_into(fmt, buffer, icmph.Length + 5, scramble_data[:size4data])
                     ext_h = icmpheader.ICMPExtHeader(hversion=2)
-                    role = 0b00001111
+                    role = 0b00001110
                     offset_buf = size_icmph_with_datagram + ext_h.Length
                     offset_data = size4data
                     for i in range(4):
@@ -593,18 +608,15 @@ class TICMPConnector:
         return buffer
 
     def unpack_data_of_packet(self, data: bytes)-> bytearray:
-        assert len(data) >= icmpheader.ICMPHeader.Length + self.__scrambler.coeffs()[0] and len(data) <= 65515, \
+        assert len(data) >= icmpheader.ICMPHeader.Length + self.scrambler_coeffs()[0] and len(data) <= 65515, \
                "Bad data size for unpacking of icmpv4!!!"
         def unpack_of_bfill(data: bytes)->bytes:
             # 1 = len(lenbfill)
             if len(data) < 1:
                 return None
-            if len(data) <= data[0]:
-                return None
-            return data[1:len(data) - data[0]]
+            return data[1:len(data) - data[0]] if len(data) > data[0] else None
 
         icmph = icmpheader.ICMPHeader(hbytes=data)
-        print(icmph)
         if icmph.type == icmpheader.TYPE_v4EchoRequest:
             return self.__scrambler.descramble(data[icmph.Length:])
 
@@ -649,148 +661,142 @@ class TICMPConnector:
             else:
                 return None
             return unpack_of_bfill(self.__scrambler.descramble(ans))
+
         elif icmph.type in (icmpheader.TYPE_v4SourceQuench, icmpheader.TYPE_v4DestinationUnreachable,
                             icmpheader.TYPE_v4TimeExceeded):
             if len(data) == icmph.Length + MIN_DATA_SIZE_v4ICMPErrMsg:
                 # 6 = len(0x45) + len(id) + len(seq_num) + len(lenbfill)
-                return unpack_of_bfill(self.__scrambler.desramble(data[icmph.Length + 5:]))
+                return unpack_of_bfill(self.__scrambler.descramble(data[icmph.Length + 5:]))
             elif len(data) > icmph.Length + MIN_DATA_SIZE_v4ICMPErrMsg:
-                length = struct.unpack_from('>B', icmph.other_bs, 5)[0]
+                length = struct.unpack_from('>B', icmph.other_bs, 1)[0]
                 if length > 0:
                     # 576 - 340 = 236; 236 - 6 + 228 - 1 = 457 # 7 = len(0x45) + len(id) + len(seq_num) + len(lenbfill) + len(lenzfill)
-                    lenzfill = struct.unpack_from('>B', data, icmph.Length + 5)
+                    lenzfill = struct.unpack_from('>B', data, icmph.Length + 5)[0]
                     size_data = length*4 + 20
-                    if len(data) < icmph.Length + size_data or lenzfill > size_data:
+                    if len(data) < icmph.Length + size_data + 340 or lenzfill > size_data:
                         return None
-                    ans = data[icmph.Length + 6: size_data - lenzfill]
+                    buf = bytearray(data[icmph.Length + 6: icmph.Length + size_data - lenzfill])
                     if size_data == 128:
-                        ans = self.__scrambler.descramble(ans)
-                        if len(ans) < 1:
-                            return None
-                        return ans[1:]
-
-                    if len(data) <  icmph.Length + size_data + icmpheader.ICMPExtHeader.Length:
-                        return None
+                        return self.__scrambler.descramble(buf)[1:]
                     exth = icmpheader.ICMPExtHeader()
                     exth.read_bytes_from(data, icmph.Length + size_data)
                     if exth.version != 2:
                         return None
-                    min_size = size_data + exth.Length
-                    offset_data = size4data
                     role = 0b00001111
+                    pos_packet = icmph.Length + size_data + exth.Length
+                    pos_buf = len(buf)
+                    buf += bytearray(228)
                     for i in range(4):
-                        if len(data) < min_size + icmpheader.ICMPExtObjHeader.Length:
-                            return None
                         extobjh = icmpheader.ICMPExtObjHeader()
-                        extobjh.read_bytes_from(data, min_size)
-                        if extobjh.cls_num != 2 or extobjh.cls_num != role or ext_obj_h.len != ext_obj_h.Length + 80:
+                        extobjh.read_bytes_from(data, pos_packet)
+                        if extobjh.cls_num != 2 or extobjh.cls_num != role or extobjh.len != extobjh.Length + 80:
                             return None
-                        min_size += icmpheader.ICMPExtObjHeader.Length
-                        if len(data) < min_size + ext_obj_h.len:
+                        pos_packet += extobjh.Length
+
+                        struct.pack_into('>4s', buf, pos_buf, data[pos_packet: pos_packet + 4])
+                        pos_packet += 4
+                        pos_buf += 4
+
+                        extaddrh = icmpheader.ICMPIntIPAddrSubObjHeader()
+                        extaddrh.read_bytes_from(data, pos_packet)
+                        if extaddrh.afi != net_header.AFI_IPv4:
                             return None
-                        ans += struct.unpack_from('>4s', data, min_size)
-                        min_size += 4
+                        pos_packet += extaddrh.Length
+                        struct.pack_into('>4s', buf, pos_buf, data[pos_packet:pos_packet + 4])
+                        pos_packet += 4
+                        pos_buf += 4
 
-                        extaddrh = None
+                        len_str = struct.unpack_from('>B', data, pos_packet)[0]
+                        if len_str < 61:
+                            return None
+                        pos_packet += 1
+                        struct.pack_into('>45s', buf, pos_buf,
+                                         base64.urlsafe_b64decode(data[pos_packet: pos_packet + 60]))
+                        pos_packet += 63
+                        pos_buf += 45
 
-                        ext_obj_addr_h = icmpheader.ICMPIntIPAddrSubObjHeader(
-                            hafi=net_header.AFI_IPv4)  # pack in ifaddr
-                        ext_obj_addr_h.write_bytes_into(buffer, offset_buf)
-                        offset_buf += ext_obj_addr_h.Length
-                        struct.pack_into('>4s', buffer, offset_buf,
-                                         scramble_data[offset_data:offset_data + 4])
-                        offset_buf += 4
-                        offset_data += 4
-
-                        struct.pack_into('>B60s3s', buffer, offset_buf, 61,  # pack in ifname
-                                         base64.urlsafe_b64encode(
-                                             scramble_data[offset_data:offset_data + 45]),
-                                         b'\x00\x00\x00')
-                        offset_buf += 64
-                        offset_data += 45
-
-                        struct.pack_into('>4s', buffer, offset_buf,
-                                         scramble_data[offset_data:offset_data + 4])  # pack in mtu
-                        offset_buf += 4
-                        offset_data += 4
+                        struct.pack_into('>4s', buf, pos_buf, data[pos_packet:pos_packet + 4])
+                        pos_packet += 4
+                        pos_buf += 4
                         role += 0b01000000
-
-                    # 7 = len(lenbfill) + len(seq_num) + len(id) + len(0x45) + len(lenzfill)
-                    # max size ifname = 63 in ifname sub-obj with field length, ifindex size = 4, mtu size = 4 in rfc5837
-                    # 45 = 3*(63//4) for applying base64; 45
-                    # (63 * 4) + (4 * 4) + (4 * 4) + (4 * 4) = 300;  ifname*4 + ifindex*4 + ifaddr*4 + mtu*4
-                    # (1 * 4) + (4 * 4) + (4 * 4) + 4 = 40;   len_ifname*4 + hdr_afi*4 + int_info_obj_hdr*4 + icmp_ext_header
-                    # 300 - 4 * (63 - 45) = 228;
-                    # 576 - 340 = 236; 236 - 6 + 228 - 1 = 457 # 7 = len(0x45) + len(id) + len(seq_num) + len(lenbfill) + len(lenzfill)
-                    size_encrypted_data = len(data) + self.scrambler_coeffs()[0] + 1  # 1 = len(lenbfill)
-                    dif = size_encrypted_data - 230  # 230 = 236 - 6
-                    bfill_size = 228 - dif if dif > 0 else 228
-                    size4data = (
-                        230 if size_encrypted_data > 230 else size_encrypted_data)  # size datagram field
-                    if size_encrypted_data < 122:
-                        zero_fill = 122 - size_encrypted_data  # 122 = 128 - 6
-                    else:
-                        ost = (6 + size4data) % 4
-                        zero_fill = 4 - ost if ost > 0 else 0  # size zero bytes filler
-
-                    ext_h = icmpheader.ICMPExtHeader(hversion=2)
-                    size_icmph_with_datagram = icmpheader.ICMPHeader.Length + 6 + size4data + zero_fill
-                    buffer = bytearray(size_icmph_with_datagram + 340)
-                    buffer[icmph.Length] = 0x45
-                    struct.pack_into('>HHB', buffer, icmph.Length + 1, self.__id, self.__seq_num, zero_fill)
-                    scramble_data = self.__scrambler.scramble(bytes([bfill_size]),
-                                                              data,
-                                                              bytes([random.randint(0, 255) for i in
-                                                                     range(bfill_size)]))
-                    fmt = f'>{size4data}s'
-                    struct.pack_into(fmt, buffer, icmph.Length + 6, scramble_data[:size4data])
-                    ext_h = icmpheader.ICMPExtHeader(hversion=2)
-                    role = 0b00001111
-                    offset_buf = size_icmph_with_datagram + ext_h.Length
-                    offset_data = size4data
-                    for i in range(4):
-                        ext_obj_h = icmpheader.ICMPExtObjHeader(hcls_num=2, hc_type=role)
-                        ext_obj_h.len = ext_obj_h.Length + 80  # 80 = 4 + 8 + 64 + 4
-                        ext_obj_h.write_bytes_into(buffer, offset_buf)
-                        offset_buf += ext_obj_h.Length
-
-                        struct.pack_into('>4s', buffer, offset_buf,
-                                         scramble_data[offset_data:offset_data + 4])  # pack in ifindex
-                        offset_buf += 4
-                        offset_data += 4
-
-                        ext_obj_addr_h = icmpheader.ICMPIntIPAddrSubObjHeader(
-                            hafi=net_header.AFI_IPv4)  # pack in ifaddr
-                        ext_obj_addr_h.write_bytes_into(buffer, offset_buf)
-                        offset_buf += ext_obj_addr_h.Length
-                        struct.pack_into('>4s', buffer, offset_buf,
-                                         scramble_data[offset_data:offset_data + 4])
-                        offset_buf += 4
-                        offset_data += 4
-
-                        struct.pack_into('>B60s3s', buffer, offset_buf, 61,  # pack in ifname
-                                         base64.urlsafe_b64encode(
-                                             scramble_data[offset_data:offset_data + 45]),
-                                         b'\x00\x00\x00')
-                        offset_buf += 64
-                        offset_data += 45
-
-                        struct.pack_into('>4s', buffer, offset_buf,
-                                         scramble_data[offset_data:offset_data + 4])  # pack in mtu
-                        offset_buf += 4
-                        offset_data += 4
-                        role += 0b01000000
-                    ext_h.write_bytes_into(buffer, size_icmph_with_datagram)
-                    struct.pack_into('>H', buffer, size_icmph_with_datagram + 2,
-                                     checksum(buffer[size_icmph_with_datagram:]))
-                    struct.pack_into('>B', icmph.other_bs, 1, (size4data - 14 + zero_fill) // 4)
+                    return unpack_of_bfill(self.__scrambler.descramble(buf))
                 else:
                     # 5 = len(0x45) + len(id) + len(seq_num)
-                    return self.__scrambler.desramble(data[icmph.Length + 5:])
+                    return self.__scrambler.descramble(data[icmph.Length + 5:])
+
+        elif icmph.type == icmpheader.TYPE_v4Redirect:
+            # 2 = len(0x45) + len(lenbfill)
+            if len(data) != icmph.Length + MIN_DATA_SIZE_v4ICMPErrMsg:
+                return None
+            return unpack_of_bfill(self.__scrambler.descramble(data[icmph.Length + 1:]))
+
+        elif icmph.type == icmpheader.TYPE_v4RouterAdvertisement:
+            # 5 = len(lenbfill) + len(id) + len(seq_num)
+            num_addrs, addr_entry_size = struct.unpack_from('>2B', icmph.other_bs)
+            if addr_entry_size != 2 or len(data) < icmph.Length + num_addrs * 8:
+                return None
+            return unpack_of_bfill(self.__scrambler.descramble(data[icmph.Length + 4:]))
+
+        elif icmph.type == icmpheader.TYPE_v4ParameterProblem:
+            if len(data) == icmph.Length + MIN_DATA_SIZE_v4ICMPErrMsg:
+                # 5 = len(0x45) + len(id(1)) + len(seq_num) + len(lenbfill)
+                return unpack_of_bfill(self.__scrambler.descramble(data[icmph.Length + 4:]))
+            elif len(data) > icmph.Length + MIN_DATA_SIZE_v4ICMPErrMsg:
+                length = struct.unpack_from('>B', icmph.other_bs, 1)[0]
+                if length > 0:
+                    # 576 - 324 = 252; 252 - 6 + 212 = 458        # 6 = len(lenbfill) + len(seq_num) + len(id(1)) + len(0x45) + len(lenzfill)
+                    lenzfill = struct.unpack_from('>B', data, icmph.Length + 4)[0]
+                    size_data = length*4 + 20
+                    if len(data) < icmph.Length + size_data + 324 or lenzfill > size_data:
+                        return None
+                    buf = bytearray(data[icmph.Length + 5: icmph.Length + size_data - lenzfill])
+                    if size_data == 128:
+                        return self.__scrambler.descramble(buf)[1:]
+                    exth = icmpheader.ICMPExtHeader()
+                    exth.read_bytes_from(data, icmph.Length + size_data)
+                    if exth.version != 2:
+                        return None
+                    role = 0b00001110
+                    pos_packet = icmph.Length + size_data + exth.Length
+                    pos_buf = len(buf)
+                    buf += bytearray(212)
+                    for i in range(4):
+                        extobjh = icmpheader.ICMPExtObjHeader()
+                        extobjh.read_bytes_from(data, pos_packet)
+                        if extobjh.cls_num != 2 or extobjh.cls_num != role or extobjh.len != extobjh.Length + 76:
+                            return None
+                        pos_packet += extobjh.Length
+
+                        struct.pack_into('>4s', buf, pos_buf, data[pos_packet: pos_packet + 4])
+                        pos_packet += 4
+                        pos_buf += 4
+
+                        extaddrh = icmpheader.ICMPIntIPAddrSubObjHeader()
+                        extaddrh.read_bytes_from(data, pos_packet)
+                        if extaddrh.afi != net_header.AFI_IPv4:
+                            return None
+                        pos_packet += extaddrh.Length
+                        struct.pack_into('>4s', buf, pos_buf, data[pos_packet:pos_packet + 4])
+                        pos_packet += 4
+                        pos_buf += 4
+
+                        len_str = struct.unpack_from('>B', data, pos_packet)[0]
+                        if len_str < 61:
+                            return None
+                        pos_packet += 1
+                        struct.pack_into('>45s', buf, pos_buf,
+                                         base64.urlsafe_b64decode(data[pos_packet: pos_packet + 60]))
+                        pos_packet += 63
+                        pos_buf += 45
+                        role += 0b01000000
+                    return unpack_of_bfill(self.__scrambler.descramble(buf))
+                else:
+                    # 4 = len(0x45) + len(id(1)) + len(seq_num)
+                    return self.__scrambler.descramble(data[icmph.Length + 4:])
         return None
 
 
-    def id_seq_num_packet(self, icmph, data: bytes)-> tuple:
+    def id_seq_num_packet(self, data: bytes)-> tuple:
         """Define packet's id and seq_num.
             If icmp type was unknown or error has occurred
             return (-1,-1)"""
@@ -852,7 +858,7 @@ class TICMPConnector:
         self.__socket.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)
         while True:
             data, addr = self.__socket.recvfrom(65515)
-            # ipv4h = ipv4header.IPv4Header(hbytes=data)
+                # ipv4h = ipv4header.IPv4Header(hbytes=data)
             hid, hseqn = self.id_seq_num_packet(data)
             if self.__id == hid and self.__seq_num == hseqn:
                 pass
