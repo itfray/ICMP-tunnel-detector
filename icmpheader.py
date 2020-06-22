@@ -122,3 +122,115 @@ def icmpv4_id(icmph):
 
 def icmpv4_seq_num(icmph):
     return struct.unpack_from(">H", icmph.other_bs, 2)[0]
+
+
+# ICMP Extension Struct Header
+# 0       4                       16                             31
+# +-------+-----------------------+------------------------------+      ---
+# |       |                       |                              |       ^
+# |version|       reserved        |          checksum            |     4 bytes
+# |       |                       |                              |       v
+# +-------+-----------------------+------------------------------+      ---
+
+class ICMPExtHeader(net_header.InterfaceNetHeader):
+    def __init__(self, **kwargs):
+        bs = kwargs.get("hbytes")
+        if bs is None:
+            self.version = kwargs.get("hversion", 0)
+            self.checksum = kwargs.get("hchecksum", 0)
+        else:
+            self.read_bytes_from(bs, 0)
+
+    def read_bytes_from(self, bs: bytes, offset: int)-> None:
+        self.version, _, self.checksum = struct.unpack_from('>BsH', bs, offset)
+        self.version = self.version >> 4
+
+    def write_bytes_into(self, buf: bytearray, offset: int)-> None:
+        struct.pack_into('>BsH', buf, offset, (self.version << 4) & 0xf0, b'\x00', self.checksum)
+
+    def to_bytes(self)-> bytes:
+        return struct.pack('>BsH', (self.version << 4) & 0xf0, b'\x00', self.checksum)
+
+    def to_bytearray(self)-> bytearray:
+        return bytearray(self.to_bytes())
+
+    def __repr__(self):
+        return "[ICMPExtHeader] {version: " + str(self.version) + ", checksum: " + str(hex(self.checksum)) + "}"
+
+    def __str__(self):
+        return self.__repr__()
+
+
+# ICMP Extension Object Header
+# 0                               16                             31
+# +-------------------------------+--------------+---------------+      ---
+# |                               |              |               |       ^
+# |          Length               |  Class-Num   |      C-Type   |     4 bytes
+# |                               |              |               |       v
+# +-------------------------------+--------------+---------------+      ---
+
+class ICMPExtObjHeader(net_header.InterfaceNetHeader):
+    def __init__(self, **kwargs):
+        bs = kwargs.get("hbytes")
+        if bs is None:
+            self.length = kwargs.get("hlength", 0)
+            self.cls_num = kwargs.get("hcls_num", 0)
+            self.c_type = kwargs.get("hc_type", 0)
+        else:
+            self.read_bytes_from(bs, 0)
+
+    def read_bytes_from(self, bs: bytes, offset: int)-> None:
+        self.length, self.cls_num, self.c_type = struct.unpack_from('>H2B', bs, offset)
+
+    def write_bytes_into(self, buf: bytearray, offset: int)-> None:
+        struct.pack_into('>H2B', buf, offset, self.length, self.cls_num, self.c_type)
+
+    def to_bytes(self)-> bytes:
+        return struct.pack('>H2B', self.length, self.cls_num, self.c_type)
+
+    def to_bytearray(self)-> bytearray:
+        return bytearray(self.to_bytes())
+
+    def __repr__(self):
+        return "[ICMPExtObjHeader] {len: " + str(self.length) + ", cls_num: " + str(self.cls_num) + \
+                ", c_type: " + str(self.c_type) + "}"
+
+    def __str__(self):
+        return self.__repr__()
+
+
+
+# ICMP Interface Identification Object Address Header
+# 0                               16                             31
+# +-------------------------------+--------------+---------------+      ---
+# |                               |              |               |       ^
+# |          AFI                  |  Addr Length |    Reserved   |     4 bytes
+# |                               |              |               |       v
+# +-------------------------------+--------------+---------------+      ---
+
+class ICMPIntIdObjAddrHeader(net_header.InterfaceNetHeader):
+    def __init__(self, **kwargs):
+        bs = kwargs.get("hbytes")
+        if bs is None:
+            self.afi = kwargs.get("hafi", 0)
+            self.addr_len = kwargs.get("haddr_len", 0)
+        else:
+            self.read_bytes_from(bs, 0)
+
+    def read_bytes_from(self, bs: bytes, offset: int)-> None:
+        self.afi, self.addr_len, _ = struct.unpack_from('>HBs', bs, offset)
+
+    def write_bytes_into(self, buf: bytearray, offset: int)-> None:
+        struct.pack_into('>HBs', buf, offset, self.afi, self.addr_len, b'\x00')
+
+    def to_bytes(self)-> bytes:
+        return struct.pack('>HBs', self.afi, self.addr_len, b'\x00')
+
+    def to_bytearray(self)-> bytearray:
+        return bytearray(self.to_bytes())
+
+    def __repr__(self):
+        return "[ICMPIntIdObjAddrHeader] {afi: " + str(self.afi) + ", addr_len: " + str(self.addr_len) + "}"
+
+    def __str__(self):
+        return self.__repr__()
