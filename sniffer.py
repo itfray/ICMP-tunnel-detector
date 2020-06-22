@@ -61,33 +61,39 @@ class Sniffer:
     def run(self):
         timeout = self.timeout * 60
         t0 = time.time()
+        dict_packets = {}                                           # store all ip packets for opeartion
         while time.time() - t0 < timeout:
-            self.sniff()
-
-    def sniff(self):
-        packet, addr = self.__socket.recvfrom(65565)
-        eth_offset = 0
-        if self.__sys_platform__ != 'win32':
-            eth_offset = eth_dix_header.EthDixHeader.Length
-        ip_hdr = ipv4header.IPv4Header()
-        ip_hdr.read_bytes_from(packet, eth_offset)
-
-        if ip_hdr.protocol == net_header.PROTO_ICMP:
+            packet, addr = self.__socket.recvfrom(65565)
+            eth_offset = 0
             if self.__sys_platform__ != 'win32':
-                self.main_pcap_file.write(packet, *time_sec_usec())                # write received packet in pcap file
-                answ = self.analyzer.analyze(packet, 34)
-            else:
-                self.main_pcap_file.write(self.eth_hdr + packet, *time_sec_usec())
-                answ = self.analyzer.analyze(packet, 20)
+                eth_offset = eth_dix_header.EthDixHeader.Length
+            ip_hdr = ipv4header.IPv4Header()
+            ip_hdr.read_bytes_from(packet, eth_offset)
 
-            if answ[1] > 0.5:
-                print_message(f"Possible tunnel detected: {ip_hdr.src_addr}:{answ[0]} --> {ip_hdr.dst_addr}")
-                # print(answ)
-                # print()
-            # icmph = icmpheader.ICMPHeader()
-            # icmph.read_bytes_from(packet, eth_offset + ip_hdr.header_length * 4)
-            # print(ip_hdr)
-            # print(icmph)
+            if ip_hdr.protocol == net_header.PROTO_ICMP:
+                if self.__sys_platform__ != 'win32':
+                    self.main_pcap_file.write(packet, *time_sec_usec())  # write received packet in pcap file
+                else:
+                    self.main_pcap_file.write(self.eth_hdr + packet, *time_sec_usec())
+
+                if ip_hdr.id not in dict_packets:                                       # if ip_header's id not in dict
+                    dict_packets[ip_hdr.id] = bytearray()                               # prepare buffer for this packet
+                dict_packets[ip_hdr.id] += packet[eth_offset + ip_hdr.header_length * 4:]   # get payload and write her in dict
+                if ip_hdr.more_fragments == 0:                                              # if this end fragment
+                    packet = dict_packets[ip_hdr.id]
+                    del dict_packets[ip_hdr.id]
+                    print("========================================================================")
+                    answ = self.analyzer.analyze(packet, 0)
+                    if answ[1] > 0.5:
+                        print_message(f"Possible tunnel detected: {ip_hdr.src_addr}:{answ[0]} --> {ip_hdr.dst_addr}")
+                        print(answ)
+                        print()
+                    icmph = icmpheader.ICMPHeader()
+                    icmph.read_bytes_from(packet, 0)
+                    print(ip_hdr)
+                    print(icmph)
+                    print("========================================================================")
+                    print()
 
 
 if __name__ == "__main__":
