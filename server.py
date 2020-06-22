@@ -17,11 +17,11 @@ class Server(NetworkComponent):
             data, addr = self.recvfrom()
             addr = addr[0]
             print_message(f"Received {len(data)} bytes from {addr}:{self.listen_id()}" +
-                          (f", data: 0x{data[:8].hex()}..., checksum: {hex(checksum(data))}" if self.debug else ''))
-
+                          (f", data: {bytes(data[:8])}..., checksum: {hex(checksum(data))}" if self.debug else ''))
             self.sendto(data, addr)
             print_message(f"Sent {len(data)} bytes to {addr}:{self.listen_id()}" +
-                          (f", data: 0x{data[:8].hex()}..., checksum: {hex(checksum(data))}" if self.debug else ''))
+                          (f", data: {bytes(data[:8])}..., checksum: {hex(checksum(data))}" if self.debug else ''))
+            print()
             self.inc_seq_num()
 
 

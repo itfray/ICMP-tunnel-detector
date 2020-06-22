@@ -47,17 +47,18 @@ class Client(NetworkComponent):
 
             self.sendto(data, self.__remote_addr)
             print_message(f"Sent {len(data)} bytes to {self.__remote_addr}:{self.listen_id()}" +
-                          (f", data: 0x{data[:8].hex()}..., checksum: {hex(checksum(data))}" if self.debug else ''))
+                          (f", data: {bytes(data[:8])}..., checksum: {hex(checksum(data))}" if self.debug else ''))
 
             recv_data, addr = self.recvfrom()
             addr = addr[0]
             print_message(f"Received {len(recv_data)} bytes from {addr}:{self.listen_id()}" +
-                          (f", data: 0x{recv_data[:8].hex()}..., checksum: {hex(checksum(recv_data))}"
+                          (f", data: {bytes(recv_data[:8])}..., checksum: {hex(checksum(recv_data))}"
                            if self.debug else ''))
 
             if data != recv_data:
                 print_message("Error receiving data!!!")
                 break
+            print()
             self.inc_seq_num()
 
 
