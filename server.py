@@ -1,14 +1,26 @@
-from network_component import DEFAULT_TIMEOUT, DEFAULT_LISTEN_ADDR, DEFAULT_SCRAMBLER_COEFFS
-from network_component import DEFAULT_CLIENT_ID, DEFAULT_SERVER_ID
-from network_component import NetworkComponent, print_message
 from rfc1071_checksum import checksum
 import argparse
+import datetime
+import socket
 import time
+import ticmp_connector
+
+DEFAULT_CLIENT_ID = 8191
+DEFAULT_SERVER_ID = 9282
+DEFAULT_LISTEN_ADDR = socket.gethostbyname_ex(socket.gethostname())[2][-1]
+DEFAULT_SCRAMBLER_COEFFS = [1, 3, 5]
+DEFAULT_TIMEOUT = 10                            # timeout working network_component
 
 
-class Server(NetworkComponent):
+def print_message(msg):
+    print(f'[{datetime.datetime.now().strftime("%H:%M:%S.%f")}] {msg}')
+
+
+class Server(ticmp_connector.TICMPConnector):
     def __init__(self, process_id: int, listen_id: int, listen_addr: str, scr_coeffs: list, timeout: int, debug: bool):
-        super().__init__(process_id, listen_id, listen_addr, scr_coeffs, timeout, debug)
+        super().__init__(process_id=process_id, listen_id=listen_id, listen_addr=listen_addr, scr_coeffs=scr_coeffs,
+                         debug=debug)
+        self.timeout = timeout
 
     def run(self):
         t0 = time.time()
@@ -76,7 +88,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("keyboard interruption!!!")
     except PermissionError:
-        print("Permission denied!!! Need run programm with superuser privileges!!!")
+        print("Permission denied!!! Need run program with superuser privileges!!!")
     except OSError as err:
         print(err)
     print()

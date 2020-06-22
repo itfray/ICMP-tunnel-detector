@@ -1,9 +1,8 @@
-from network_component import DEFAULT_TIMEOUT, DEFAULT_LISTEN_ADDR, DEFAULT_SCRAMBLER_COEFFS
-from network_component import DEFAULT_CLIENT_ID, DEFAULT_SERVER_ID
-from network_component import NetworkComponent, print_message
 from rfc1071_checksum import checksum
 import argparse
+import datetime
 import time
+import socket
 import ticmp_connector
 import random
 import sys
@@ -11,12 +10,23 @@ import os
 
 
 DEFAULT_FILE = 'default_file.txt'
+DEFAULT_CLIENT_ID = 8191
+DEFAULT_SERVER_ID = 9282
+DEFAULT_LISTEN_ADDR = socket.gethostbyname_ex(socket.gethostname())[2][-1]
+DEFAULT_SCRAMBLER_COEFFS = [1, 3, 5]
+DEFAULT_TIMEOUT = 10                            # timeout working network_component
 
 
-class Client(NetworkComponent):
+def print_message(msg):
+    print(f'[{datetime.datetime.now().strftime("%H:%M:%S.%f")}] {msg}')
+
+
+class Client(ticmp_connector.TICMPConnector):
     def __init__(self, pid: int, lid: int, remote_addr: str, listen_addr: str, scr_coeffs: list,
                  mode: list, timeout: int, filename: str, size_block_file: int, debug: bool):
-        super().__init__(pid, lid, listen_addr, scr_coeffs, timeout, debug)
+        super().__init__(process_id=pid, listen_id=lid, listen_addr=listen_addr, scr_coeffs=scr_coeffs,
+                         debug=debug)
+        self.timeout = timeout
         self.__remote_addr = remote_addr                        # adress server
         self.mode = mode                                        # mode work
 
@@ -157,9 +167,9 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("keyboard interruption!!!")
     except FileNotFoundError:
-        print(f"File {client.filename} not found!!!")
+        print(f"File {args.file} not found!!!")
     except PermissionError:
-        print("Permission denied!!! Need run programm with superuser privileges!!!")
+        print("Permission denied!!! Need run program with superuser privileges!!!")
     except OSError as err:
         print(err)
     print()
