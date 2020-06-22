@@ -25,20 +25,21 @@ import random
 #            * if source_size = 13 and coeffs[0] = 3 then destination_size must be 10
 #        */
 
+
 def scramble(bsrc: bytes, coeffs = (1, 3, 5))-> bytearray:
     if len(coeffs) == 0:
         raise ValueError("Uncorrect scramble coefficients!!!")
-    bdst = bytearray(coeffs[0] + len(bsrc))
+    bdst = bytearray(coeffs[0] + len(bsrc))                    # create buffer for answer
     for i in range(coeffs[0]):
-        bdst[i] = random.randint(0, 255)
-    di = coeffs[0]
+        bdst[i] = random.randint(0, 255)                       # generate rand bytes
+    di = coeffs[0]                                             # index var for bdst buffer
     for i in range(len(bsrc)):
         bdst[di] = bsrc[i]
-        for coeff in coeffs:
+        for coeff in coeffs:                                   # apply all cofficients
             if di >= coeff:
                 bdst[di] ^= bdst[di - coeff]
         di += 1
-    return bdst
+    return bdst                                                # return scrambling buffer
 
 
 def descramble(bsrc: bytes, coeffs = (1, 3, 5))-> bytearray:
@@ -55,7 +56,7 @@ def descramble(bsrc: bytes, coeffs = (1, 3, 5))-> bytearray:
     return bdst
 
 
-def scramble_many(coeffs, *args):
+def scramble_many(coeffs: tuple, *args)-> bytearray:
     if len(coeffs) == 0:
         raise ValueError("Uncorrect scramble coefficients!!!")
     size = 0
