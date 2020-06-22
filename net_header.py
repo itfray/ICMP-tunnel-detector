@@ -8,6 +8,12 @@ PROTO_IPv6 = 41
 PROTO_TCP = 6
 PROTO_UDP = 17
 
+# AFI numbers
+AFI_IPv4 = 1
+AFI_IPv6 = 2
+AFI_MAC48 = 16389
+AFI_MAC64 = 16390
+
 
 # interface for any class network header
 class InterfaceNetHeader(abc.ABC):
