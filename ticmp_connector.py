@@ -248,6 +248,7 @@ class TICMPConnector:
     def close_connector(self):
         if self.__socket:
             self.__socket.ioctl(socket.SIO_RCVALL, socket.RCVALL_OFF)
+            self.__socket.close()
             del self.__socket
             self.__socket = None
 
