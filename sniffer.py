@@ -9,6 +9,12 @@ import pcap_file
 import time
 import argparse
 from print_net_header import print_ipv4_header, print_icmp_header
+import icmp_analyzer
+import datetime
+
+
+def print_message(msg):
+    print(f'[{datetime.datetime.now().strftime("%H:%M:%S.%f")}] {msg}')
 
 
 DEFAULT_TIMEOUT = 10                        # default value, how many minutes will be work sniffer
@@ -22,6 +28,7 @@ def time_sec_usec()-> tuple:
 class Sniffer:
     def __init__(self, **kwargs):
         self.__sys_platform__ = sys.platform
+        self.analyzer = icmp_analyzer.ICMPAnalyzer()
         self.__socket = None
         self.eth_hdr = eth_dix_header.EthDixHeader(hdst_addr=b'\xb2\xad\x8c\xe4\x81\x09',
                                                    hsrc_addr=b'\x3a\x49\x73\x86\xf4\x22',
@@ -81,16 +88,19 @@ class Sniffer:
         if ip_hdr.protocol == net_header.PROTO_ICMP:
             if self.__sys_platform__ != 'win32':
                 self.main_pcap_file.write(packet, *time_sec_usec())                # write received packet in pcap file
+                answ = self.analyzer.analyze(packet, 34)
             else:
                 self.main_pcap_file.write(self.eth_hdr + packet, *time_sec_usec())
-            print("================================================================")
-            print_ipv4_header(ip_header=ip_hdr)
-            print()
-            icmph = icmpheader.ICMPHeader()
-            icmph.read_bytes_from(packet, eth_offset + ip_hdr.header_length * 4)
-            print_icmp_header(icmp_header=icmph)
-            print()
-            print()
+                answ = self.analyzer.analyze(packet, 20)
+
+            if answ[1] > 0.66:
+                print_message(f"Possible tunnel detected: {ip_hdr.src_addr}:{answ[0]} --> {ip_hdr.dst_addr}")
+                # print(answ)
+                # print()
+            # icmph = icmpheader.ICMPHeader()
+            # icmph.read_bytes_from(packet, eth_offset + ip_hdr.header_length * 4)
+            # print(ip_hdr)
+            # print(icmph)
 
 
 if __name__ == "__main__":
